@@ -2,14 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>BNA +Hogares — Propiedades en Córdoba</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; height: -webkit-fill-available; overflow: hidden; }
 
     /* ── Login screen ── */
     #login-screen {
@@ -120,6 +120,44 @@
     .legend b { display: block; margin-bottom: 5px; }
     .legend-item { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
     .legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  
+    /* ── iOS safe area ── */
+    #header {
+      padding-top: max(10px, env(safe-area-inset-top));
+      padding-left: max(20px, env(safe-area-inset-left));
+      padding-right: max(20px, env(safe-area-inset-right));
+    }
+    #controls {
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+    #map {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ── Mobile layout ── */
+    @media (max-width: 600px) {
+      #header h1 { font-size: 14px; }
+      #header .sub { font-size: 10px; }
+      .stat .num { font-size: 17px; }
+
+      #controls {
+        padding: 6px 10px;
+        gap: 5px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+      }
+      #controls label { display: none; }
+      #controls input { width: 80px !important; font-size: 11px; padding: 4px 6px; }
+      #controls input[id="locF"] { width: 110px !important; }
+      .btn { padding: 5px 10px; font-size: 11px; }
+      .badge { font-size: 10px; padding: 2px 7px; white-space: nowrap; }
+
+      #login-box { width: 88vw; padding: 30px 24px; }
+      #login-box h2 { font-size: 16px; }
+    }
+
   </style>
 </head>
 <body>
