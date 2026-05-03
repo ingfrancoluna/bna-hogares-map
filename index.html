@@ -9,11 +9,11 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; height: -webkit-fill-available; overflow: hidden; }
+    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
 
     /* ── Login screen ── */
     #login-screen {
-      position: fixed; inset: 0; z-index: 9999;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999;
       background: linear-gradient(135deg, #1a3c5e 0%, #2d6a9f 100%);
       display: flex; align-items: center; justify-content: center;
     }
@@ -389,6 +389,25 @@ function resetFilters() {
   document.getElementById('visibleCount').textContent = DATA.length;
   document.getElementById('badge').textContent = DATA.length + ' propiedades';
 }
+</script>
+
+<script>
+function fixHeight() {
+  var vh = window.innerHeight;
+  document.body.style.height = vh + 'px';
+  document.getElementById('app').style.height = vh + 'px';
+  var header = document.getElementById('header');
+  var controls = document.getElementById('controls');
+  var mapEl = document.getElementById('map');
+  if (header && controls && mapEl) {
+    var used = header.offsetHeight + controls.offsetHeight;
+    mapEl.style.height = (vh - used) + 'px';
+  }
+}
+window.addEventListener('load', fixHeight);
+window.addEventListener('resize', fixHeight);
+// iOS fires resize when address bar shows/hides
+window.addEventListener('orientationchange', function() { setTimeout(fixHeight, 300); });
 </script>
 </body>
 </html>
