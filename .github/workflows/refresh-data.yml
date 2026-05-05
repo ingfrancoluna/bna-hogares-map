@@ -1,0 +1,39 @@
+name: Refresh data
+
+on:
+  workflow_dispatch:
+  # cron desactivado hasta validar la fase 1.
+  # schedule:
+  #   - cron: '0 */6 * * *'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run scraper
+        run: node scrape.js
+
+      - name: Upload capture artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-output
+          path: |
+            data.json
+            debug-capture.json
+            debug-raw-sample.json
+          retention-days: 7
