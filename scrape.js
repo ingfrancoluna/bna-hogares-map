@@ -1,134 +1,92 @@
-const { chromium } = require('playwright');
 const fs = require('fs');
 
-const ENTRY_URLS = [
-  'https://mashogaresconbna.com.ar/list',
-  'https://mashogaresconbna.com.ar/'
-];
+const API = 'https://mashogaresconbna.com.ar/api/propiedades';
+const PROVINCIA = 'Córdoba';
+const TIPO = 'Casa';
+const TIPO_OPERACION = 'Venta';
 
-const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-
-function looksLikeProperty(o) {
-  return o && typeof o === 'object'
-    && (typeof o.lat === 'number' || typeof o.latitud === 'number')
-    && (typeof o.lng === 'number' || typeof o.longitud === 'number' || typeof o.lon === 'number');
-}
-
-function findArraysWithProperties(node, out = []) {
-  if (Array.isArray(node)) {
-    if (node.length > 0 && node.every(looksLikeProperty)) {
-      out.push(node);
-      return out;
+async function fetchAll() {
+  const url = `${API}?limit=30000&page=1&tipo=${encodeURIComponent(TIPO)}&tipoOperacion=${encodeURIComponent(TIPO_OPERACION)}`;
+  console.log(`GET ${url}`);
+  const res = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'bna-hogares-map-bot/1.0 (+https://github.com/ingfrancoluna/bna-hogares-map)',
+      'Accept-Language': 'es-AR,es;q=0.9'
     }
-    for (const v of node) findArraysWithProperties(v, out);
-  } else if (node && typeof node === 'object') {
-    for (const k of Object.keys(node)) findArraysWithProperties(node[k], out);
-  }
-  return out;
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.internalStatus !== 'SUCCESS') throw new Error(`internalStatus=${json.internalStatus}`);
+  return json.response.data;
 }
 
-function tryParseJSON(text) {
-  try { return JSON.parse(text); } catch {}
-  // Server Actions de Next a veces devuelven multipart con líneas JSON
-  const lines = text.split('\n').filter(Boolean);
-  const parsed = [];
-  for (const line of lines) {
-    const idx = line.indexOf(':');
-    const candidate = idx >= 0 ? line.slice(idx + 1).trim() : line.trim();
-    try { parsed.push(JSON.parse(candidate)); } catch {}
-  }
-  return parsed.length ? parsed : null;
+function parseNum(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mapItem(p) {
+  const lat = parseNum(p.latitud);
+  const lng = parseNum(p.longitud);
+  if (lat == null || lng == null) return null;
+
+  const cleanArr = (a) => Array.isArray(a) ? a.filter(x => x != null && x !== '') : [];
+  const comodidades = Array.from(new Set([
+    ...cleanArr(p.serviciosInmueble),
+    ...cleanArr(p.caracteristicas),
+    ...cleanArr(p.caractGenerales)
+  ]));
+
+  return {
+    id: p.id,
+    titulo: p.titulo || '',
+    lat,
+    lng,
+    precio: parseNum(p.precio),
+    moneda: p.moneda || 'USD',
+    localidad: p.localidad || '',
+    provincia: p.provincia || '',
+    direccion: p.direccionDescripcion || '',
+    dormitorios: parseNum(p.dormitorios),
+    banos: parseNum(p.banos),
+    cocheras: parseNum(p.cocheras),
+    superficieCubierta: parseNum(p.superficieCubierta),
+    superficieTotal: parseNum(p.superficieTotal),
+    estado: p.estadoPropiedad || '',
+    disposicion: p.disposicion || '',
+    servicios: cleanArr(p.servicios),
+    comodidades,
+    imagen: Array.isArray(p.imagenes) && p.imagenes.length ? p.imagenes[0] : null
+  };
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
-  const ctx = await browser.newContext({
-    userAgent: UA,
-    locale: 'es-AR',
-    viewport: { width: 1366, height: 900 }
-  });
-  const page = await ctx.newPage();
+  const all = await fetchAll();
+  console.log(`Recibidas: ${all.length} propiedades (todo el país, ${TIPO} en ${TIPO_OPERACION})`);
 
-  const captured = [];
-  const seenUrls = new Set();
+  const filtered = all.filter(p =>
+    p.provincia === PROVINCIA &&
+    p.publicado === true &&
+    p.bloqueado === false &&
+    p.eliminado === false
+  );
+  console.log(`Filtradas a ${PROVINCIA}, publicadas y no bloqueadas: ${filtered.length}`);
 
-  page.on('response', async (resp) => {
-    const url = resp.url();
-    const status = resp.status();
-    if (status >= 400) return;
-    const ct = (resp.headers()['content-type'] || '').toLowerCase();
-    if (!ct.includes('json') && !ct.includes('text') && !ct.includes('javascript')) return;
-    let text;
-    try { text = await resp.text(); } catch { return; }
-    if (text.length < 50) return;
-    if (!/"lat"|"latitud"/.test(text)) return;
-    if (!/"lng"|"longitud"|"lon"/.test(text)) return;
-    captured.push({ url, status, ct, length: text.length, text });
-    if (!seenUrls.has(url)) {
-      seenUrls.add(url);
-      console.log(`[capture] ${status} ${ct} ${text.length}b ${url}`);
-    }
-  });
+  const mapped = filtered.map(mapItem).filter(Boolean);
+  console.log(`Con lat/lng válida: ${mapped.length}`);
 
-  for (const entry of ENTRY_URLS) {
-    console.log(`\n=== Visitando ${entry} ===`);
-    try {
-      await page.goto(entry, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    } catch (e) {
-      console.log(`navigation error: ${e.message}`);
-      continue;
-    }
-    try { await page.waitForLoadState('networkidle', { timeout: 20000 }); } catch {}
+  mapped.sort((a, b) => a.id - b.id);
 
-    for (let i = 0; i < 12; i++) {
-      await page.mouse.wheel(0, 4000);
-      await page.waitForTimeout(700);
-    }
-    await page.waitForTimeout(3000);
-  }
+  fs.writeFileSync('data.json', JSON.stringify(mapped));
+  console.log(`data.json: ${(fs.statSync('data.json').size / 1024).toFixed(1)} KB`);
 
-  await browser.close();
-
-  console.log(`\nResponses capturadas: ${captured.length}`);
-
-  const allProps = new Map();
-  const debug = [];
-
-  for (const c of captured) {
-    const parsed = tryParseJSON(c.text);
-    if (!parsed) {
-      debug.push({ url: c.url, length: c.length, parsed: false, sample: c.text.slice(0, 300) });
-      continue;
-    }
-    const arrays = findArraysWithProperties(parsed);
-    debug.push({
-      url: c.url,
-      length: c.length,
-      parsed: true,
-      arraysFound: arrays.length,
-      arraySizes: arrays.map(a => a.length),
-      firstItemSample: arrays[0]?.[0] ? Object.keys(arrays[0][0]).slice(0, 30) : null
-    });
-    for (const arr of arrays) {
-      for (const p of arr) {
-        const id = p.id ?? p._id ?? p.codigo ?? `${p.lat ?? p.latitud},${p.lng ?? p.longitud ?? p.lon}`;
-        allProps.set(String(id), p);
-      }
-    }
-  }
-
-  const merged = Array.from(allProps.values());
-  console.log(`Propiedades únicas consolidadas: ${merged.length}`);
-
-  fs.writeFileSync('data.json', JSON.stringify(merged, null, 2));
-  fs.writeFileSync('debug-capture.json', JSON.stringify(debug, null, 2));
-
-  if (captured.length > 0) {
-    fs.writeFileSync('debug-raw-sample.json', captured[0].text.slice(0, 100000));
-  }
-
-  if (merged.length === 0) {
-    console.error('No se capturaron propiedades. Revisar artifact debug-capture.json.');
+  if (mapped.length === 0) {
+    console.error('Cero propiedades tras filtros. Algo cambió en la API.');
     process.exit(1);
   }
-})();
+})().catch(e => {
+  console.error('FAIL:', e);
+  process.exit(1);
+});
