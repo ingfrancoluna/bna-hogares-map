@@ -59,7 +59,8 @@ function mapItem(p) {
     servicios: cleanArr(p.servicios),
     comodidades,
     imagen: Array.isArray(p.imagenes) && p.imagenes.length ? p.imagenes[0] : null,
-    fechaCreacion: p.fechaCreacion || null
+    fechaCreacion: p.fechaCreacion || null,
+    fuente: 'bna'
   };
 }
 
