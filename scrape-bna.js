@@ -86,8 +86,8 @@ function mapItem(p) {
     return tb - ta;
   });
 
-  fs.writeFileSync('data.json', JSON.stringify(mapped));
-  console.log(`data.json: ${(fs.statSync('data.json').size / 1024).toFixed(1)} KB`);
+  fs.writeFileSync('data-bna.json', JSON.stringify(mapped));
+  console.log(`data.json: ${(fs.statSync('data-bna.json').size / 1024).toFixed(1)} KB`);
 
   if (mapped.length === 0) {
     console.error('Cero propiedades tras filtros. Algo cambió en la API.');

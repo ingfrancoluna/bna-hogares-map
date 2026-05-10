@@ -346,22 +346,32 @@ function loadData(){
   var loader = document.getElementById('data-loader');
   var errBox = document.getElementById('data-loader-err');
   loader.classList.remove('hidden'); errBox.textContent='';
-  fetch('./data.json', {cache:'no-cache'})
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(function(d){
-      DATA = Array.isArray(d) ? d : [];
-      var n = DATA.length;
-      document.getElementById('totalCount').textContent = n;
-      document.getElementById('visibleCount').textContent = n;
-      document.getElementById('badge').textContent = n + ' propiedades';
-      renderSourceButtons();
-      loader.classList.add('hidden');
-      initMap();
-    })
-    .catch(function(err){
-      errBox.textContent = 'No se pudo cargar data.json — ' + err.message;
-      document.querySelector('#data-loader .msg').textContent = 'Error de carga';
-    });
+
+  // Una entrada por archivo de fuente. Si falla uno, igual seguimos con el resto.
+  var sources = [
+    { id: 'bna',       url: './data-bna.json' },
+    { id: 'argenprop', url: './data-argenprop.json' }
+  ];
+
+  Promise.all(sources.map(function(s){
+    return fetch(s.url, {cache:'no-cache'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(d){ return Array.isArray(d) ? d : []; })
+      .catch(function(err){ console.warn('Falló', s.id, err.message); return []; });
+  })).then(function(parts){
+    DATA = [].concat.apply([], parts);
+    var n = DATA.length;
+    if (n === 0) throw new Error('No se cargó ninguna fuente');
+    document.getElementById('totalCount').textContent = n;
+    document.getElementById('visibleCount').textContent = n;
+    document.getElementById('badge').textContent = n + ' propiedades';
+    renderSourceButtons();
+    loader.classList.add('hidden');
+    initMap();
+  }).catch(function(err){
+    errBox.textContent = 'No se pudieron cargar los datos — ' + err.message;
+    document.querySelector('#data-loader .msg').textContent = 'Error de carga';
+  });
 }
 if(sessionStorage.getItem(SESSION_KEY)==='1'){
   document.addEventListener('DOMContentLoaded', showApp);
@@ -412,7 +422,8 @@ var showOnlyNew = false;
 // 1) que el scraper marque sus items con `fuente: '<id>'`
 // 2) sumar una entrada acá con id, label y color
 var SOURCES = [
-  { id: 'bna', label: '\u{1F3DB}️ BNA', color: '#1a3c5e' }
+  { id: 'bna',       label: '\u{1F3DB}️ BNA',       color: '#1a3c5e' },
+  { id: 'argenprop', label: '\u{1F3E1} Argenprop', color: '#10b981' }
 ];
 var activeSources = new Set(SOURCES.map(function(s){return s.id;}));
 var map, clusterGroup, markers=[], labels=[], visible=[];
