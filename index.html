@@ -43,6 +43,10 @@
     #apply-btn:hover{background:#ea6a0a}
     #reset-btn{background:#6b7280;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer}
     #reset-btn:hover{background:#4b5563}
+    #only-new-btn{background:#fff;color:#f59e0b;border:1.5px solid #f59e0b;border-radius:6px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s}
+    #only-new-btn:hover{background:#fff5e6}
+    #only-new-btn.active{background:#f59e0b;color:#fff;box-shadow:0 0 0 2px rgba(245,158,11,.25)}
+    #only-new-btn.active:hover{background:#d97706}
 
     /* FILTER PANEL */
     #filter-panel{position:absolute;top:0;left:0;width:290px;height:100%;background:#fff;z-index:1000;box-shadow:4px 0 16px rgba(0,0,0,.15);display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s ease}
@@ -162,6 +166,7 @@
     <button id="filter-toggle" onclick="togglePanel()">&#9776; Filtros</button>
     <button id="apply-btn" onclick="applyFilters()">&#128269; Aplicar</button>
     <button id="reset-btn" onclick="resetFilters()" title="Limpiar filtros">&#10005;</button>
+    <button id="only-new-btn" onclick="toggleOnlyNew()" aria-pressed="false" title="Mostrar sólo las propiedades nuevas">&#127381; Sólo nuevas</button>
     <span class="badge" id="badge">Cargando…</span>
   </div>
 
@@ -395,6 +400,7 @@ document.addEventListener('change', function(e){
 var ZOOM_THRESHOLD = 13;
 var DATA = [];
 var DAYS_NEW = 30;
+var showOnlyNew = false;
 var map, clusterGroup, markers=[], labels=[], visible=[];
 
 function diasDesde(iso){
@@ -543,6 +549,7 @@ function applyFilters(){
     if(show&&servChecked.length>0){ var ps=p.servicios||[]; var ok=servChecked.every(function(s){return ps.indexOf(s)>=0;}); if(!ok)show=false; }
     if(show&&comodChecked.length>0){ var pc=p.comodidades||[]; var ok2=comodChecked.every(function(s){return pc.indexOf(s)>=0;}); if(!ok2)show=false; }
     if(show&&Number.isFinite(dmaxDays)){ var dd=diasDesde(p.fechaCreacion); if(dd==null||dd>dmaxDays) show=false; }
+    if(show&&showOnlyNew&&!isNuevo(p)) show=false;
 
     visible[i]=show;
     if(show){ clusterGroup.addLayer(markers[i]); if(showLbl)labels[i].show(); else labels[i].hide(); count++; }
@@ -559,6 +566,12 @@ function resetFilters(){
   // restaurar default del campo "marcar como nuevas"
   document.getElementById('f-days-new').value = '30';
   applyDaysNew();
+  // desactivar "sólo nuevas" si estaba activo
+  if(showOnlyNew){
+    showOnlyNew = false;
+    var btn = document.getElementById('only-new-btn');
+    if(btn){ btn.classList.remove('active'); btn.setAttribute('aria-pressed','false'); }
+  }
   var showLbl=map&&map.getZoom()>=ZOOM_THRESHOLD;
   DATA.forEach(function(p,i){ visible[i]=true; clusterGroup.addLayer(markers[i]); if(showLbl)labels[i].show(); else labels[i].hide(); });
   document.getElementById('visibleCount').textContent=DATA.length;
@@ -581,6 +594,16 @@ function applyDaysNew(){
     var lbl = labels[i];
     if(lbl) lbl.setNew(nowNew);
   });
+  // si el toggle "sólo nuevas" está activo, refrescar visibilidad
+  if(showOnlyNew) applyFilters();
+}
+
+function toggleOnlyNew(){
+  showOnlyNew = !showOnlyNew;
+  var btn = document.getElementById('only-new-btn');
+  btn.classList.toggle('active', showOnlyNew);
+  btn.setAttribute('aria-pressed', showOnlyNew ? 'true' : 'false');
+  applyFilters();
 }
 
 // listener con debounce para el input de N
