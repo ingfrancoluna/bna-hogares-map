@@ -98,6 +98,17 @@
 
     /* PRICE LABEL */
     .price-label{background:rgba(0,0,0,.65);color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;font-weight:700;white-space:nowrap;pointer-events:none;transform:translate(-50%,-170%);position:absolute;display:none;font-family:Arial,sans-serif}
+    .price-label.new{background:#f59e0b}
+    .price-label.new::after{content:" \01F195"}
+
+    /* NEW BADGE */
+    .marker-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+    .marker-dot.new{box-shadow:0 0 0 3px rgba(245,158,11,.85),0 1px 4px rgba(0,0,0,.4)}
+    .popup-new-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
+    .fp-row-inline{display:flex;gap:6px;align-items:center;font-size:11px;color:#555;margin-bottom:6px;flex-wrap:wrap}
+    .fp-row-inline label{flex:1;min-width:0}
+    .fp-row-inline input[type=number]{width:62px;border:1px solid #ccc;border-radius:5px;padding:5px 7px;font-size:12px;outline:none}
+    .fp-row-inline input[type=number]:focus{border-color:#2d6a9f}
 
     /* LOADER */
     #data-loader{position:absolute;inset:0;background:rgba(255,255,255,.92);z-index:1500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:Arial,sans-serif}
@@ -163,6 +174,20 @@
         <button id="fp-close" onclick="closePanel()">&#10005;</button>
       </div>
       <div id="fp-body">
+
+        <div class="fp-section">
+          <div class="fp-section-title">Antigüedad de publicación</div>
+          <div class="fp-row-inline">
+            <label>Marcar como nuevas las últimas</label>
+            <input type="number" id="f-days-new" min="1" value="30">
+            <span>días</span>
+          </div>
+          <div class="fp-row-inline">
+            <label>Mostrar sólo las últimas</label>
+            <input type="number" id="f-days-max" min="1" placeholder="∞">
+            <span>días</span>
+          </div>
+        </div>
 
         <div class="fp-section">
           <div class="fp-section-title">Localidad</div>
@@ -369,7 +394,33 @@ document.addEventListener('change', function(e){
 // ── Map ──────────────────────────────────────────────────────────────────
 var ZOOM_THRESHOLD = 13;
 var DATA = [];
+var DAYS_NEW = 30;
 var map, clusterGroup, markers=[], labels=[], visible=[];
+
+function diasDesde(iso){
+  if(!iso) return null;
+  var t = Date.parse(iso); if(isNaN(t)) return null;
+  return Math.floor((Date.now()-t)/86400000);
+}
+function fmtFechaCorta(iso){
+  if(!iso) return null;
+  var d = new Date(iso); if(isNaN(d)) return null;
+  var dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0');
+  return dd+'/'+mm+'/'+d.getFullYear();
+}
+function fmtFechaHumana(iso){
+  var d = diasDesde(iso); if(d==null) return null;
+  if(d<=0) return 'hoy';
+  if(d===1) return 'ayer';
+  if(d<7) return 'hace '+d+' días';
+  if(d<30){ var w=Math.floor(d/7); return 'hace '+w+' semana'+(w>1?'s':''); }
+  if(d<365){ var mo=Math.floor(d/30); return 'hace '+mo+' mes'+(mo>1?'es':''); }
+  var y=Math.floor(d/365); return 'hace '+y+' año'+(y>1?'s':'');
+}
+function isNuevo(p){
+  var d = diasDesde(p.fechaCreacion);
+  return d!=null && d<=DAYS_NEW;
+}
 
 function initMap(){
   window._mapInited = true;
@@ -381,41 +432,53 @@ function initMap(){
 
   function getColor(p){ if(!p||p<80000)return'#22c55e'; if(p<150000)return'#3b82f6'; if(p<220000)return'#f97316'; return'#ef4444'; }
   function fmtP(p,m){ if(!p)return'Consultar'; var pfx=(m||'USD')+' '; if(p>=1000000)return pfx+(p/1000000).toFixed(1)+'M'; if(p>=1000)return pfx+(p/1000).toFixed(0)+'K'; return pfx+p; }
-  function mkIcon(c){ return L.divIcon({className:'',html:'<div style="width:12px;height:12px;border-radius:50%;background:'+c+';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',iconSize:[12,12],iconAnchor:[6,6],popupAnchor:[0,-10]}); }
+  function mkIcon(c, isNew){ return L.divIcon({className:'',html:'<div class="marker-dot'+(isNew?' new':'')+'" style="background:'+c+'"></div>',iconSize:[12,12],iconAnchor:[6,6],popupAnchor:[0,-10]}); }
+  window._mkIcon = mkIcon;
 
   var LabelOverlay = L.Layer.extend({
-    initialize:function(ll,t){this._ll=ll;this._t=t;},
+    initialize:function(ll,t,isNew){this._ll=ll;this._t=t;this._isNew=!!isNew;},
     onAdd:function(m){
       this._map=m;
       var d=document.createElement('div');
-      d.className='price-label'; d.textContent=this._t; this._el=d;
+      d.className='price-label'+(this._isNew?' new':''); d.textContent=this._t; this._el=d;
       m.getPanes().overlayPane.appendChild(d);
       m.on('zoom viewreset moveend',this._upd,this); this._upd();
     },
     onRemove:function(m){ m.getPanes().overlayPane.removeChild(this._el); m.off('zoom viewreset moveend',this._upd,this); },
     _upd:function(){ var pt=this._map.latLngToLayerPoint(this._ll); this._el.style.left=pt.x+'px'; this._el.style.top=pt.y+'px'; },
+    setNew:function(isNew){ this._isNew=!!isNew; if(this._el) this._el.classList.toggle('new',!!isNew); },
     show:function(){this._el.style.display='block';},
     hide:function(){this._el.style.display='none';}
   });
 
-  clusterGroup = L.markerClusterGroup({chunkedLoading:true, maxClusterRadius:50});
-
-  DATA.forEach(function(p,i){
-    var color=getColor(p.precio), price=fmtP(p.precio,p.moneda), ll=L.latLng(p.lat,p.lng);
-    var m=L.marker(ll,{icon:mkIcon(color)});
+  function buildPopupHtml(p, isNew){
+    var price=fmtP(p.precio,p.moneda);
     var imgH=p.imagen?'<img class="popup-img" src="'+p.imagen+'" loading="lazy" onerror="this.style.display=\'none\'">':'';
+    var pill=isNew?'<span class="popup-new-pill">Nueva</span>':'';
     var body='<div class="popup-body"><div class="popup-addr">&#128205; '+(p.direccion||p.localidad+', Córdoba')+'</div>';
     if(p.localidad) body+='<div class="popup-row"><span class="popup-key">Localidad</span><span class="popup-val">'+p.localidad+'</span></div>';
     if(p.dormitorios) body+='<div class="popup-row"><span class="popup-key">Dormitorios</span><span class="popup-val">'+p.dormitorios+'</span></div>';
     if(p.banos) body+='<div class="popup-row"><span class="popup-key">Baños</span><span class="popup-val">'+p.banos+'</span></div>';
     if(p.superficieCubierta) body+='<div class="popup-row"><span class="popup-key">Sup. cubierta</span><span class="popup-val">'+p.superficieCubierta+' m²</span></div>';
     if(p.superficieTotal) body+='<div class="popup-row"><span class="popup-key">Sup. total</span><span class="popup-val">'+p.superficieTotal+' m²</span></div>';
+    var fechaH=fmtFechaHumana(p.fechaCreacion), fechaC=fmtFechaCorta(p.fechaCreacion);
+    if(fechaH) body+='<div class="popup-row"><span class="popup-key">Publicado</span><span class="popup-val" title="'+(fechaC||'')+'">'+fechaH+pill+'</span></div>';
     body+='</div>';
-    var popup=imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="https://mashogaresconbna.com.ar/propiedad/'+p.id+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
-    m.bindPopup(popup,{maxWidth:270});
+    return imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="https://mashogaresconbna.com.ar/propiedad/'+p.id+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
+  }
+  window._buildPopupHtml = buildPopupHtml;
+
+  clusterGroup = L.markerClusterGroup({chunkedLoading:true, maxClusterRadius:50});
+
+  DATA.forEach(function(p,i){
+    var color=getColor(p.precio), price=fmtP(p.precio,p.moneda), ll=L.latLng(p.lat,p.lng);
+    var nuevo = isNuevo(p);
+    var m=L.marker(ll,{icon:mkIcon(color, nuevo)});
+    m._color=color; m._isNew=nuevo;
+    m.bindPopup(buildPopupHtml(p, nuevo),{maxWidth:270});
     clusterGroup.addLayer(m);
     markers.push(m); visible.push(true);
-    var lbl=new LabelOverlay(ll,price); lbl.addTo(map); labels.push(lbl);
+    var lbl=new LabelOverlay(ll,price,nuevo); lbl.addTo(map); labels.push(lbl);
   });
 
   map.addLayer(clusterGroup);
@@ -447,6 +510,7 @@ function applyFilters(){
   var stmin= parseFloat(document.getElementById('f-stmin').value)||0;
   var stmax= parseFloat(document.getElementById('f-stmax').value)||Infinity;
   var loc  = document.getElementById('f-loc').value.toLowerCase().trim();
+  var dmaxDays = parseFloat(document.getElementById('f-days-max').value);
 
   var estados    = Array.from(document.querySelectorAll('.fp-section input[id^="f-est-"]:checked')).map(function(e){return e.value;});
   var disposiciones = Array.from(document.querySelectorAll('.fp-section input[id^="f-dis-"]:checked')).map(function(e){return e.value;});
@@ -478,6 +542,7 @@ function applyFilters(){
     if(show&&disposiciones.length>0&&(!p.disposicion||disposiciones.indexOf(p.disposicion)<0)) show=false;
     if(show&&servChecked.length>0){ var ps=p.servicios||[]; var ok=servChecked.every(function(s){return ps.indexOf(s)>=0;}); if(!ok)show=false; }
     if(show&&comodChecked.length>0){ var pc=p.comodidades||[]; var ok2=comodChecked.every(function(s){return pc.indexOf(s)>=0;}); if(!ok2)show=false; }
+    if(show&&Number.isFinite(dmaxDays)){ var dd=diasDesde(p.fechaCreacion); if(dd==null||dd>dmaxDays) show=false; }
 
     visible[i]=show;
     if(show){ clusterGroup.addLayer(markers[i]); if(showLbl)labels[i].show(); else labels[i].hide(); count++; }
@@ -491,11 +556,43 @@ function applyFilters(){
 function resetFilters(){
   document.querySelectorAll('#fp-body input[type=number], #fp-body input[type=text]').forEach(function(el){el.value='';});
   document.querySelectorAll('#fp-body input[type=checkbox]').forEach(function(el){el.checked=false; el.closest('.fp-check').classList.remove('checked');});
+  // restaurar default del campo "marcar como nuevas"
+  document.getElementById('f-days-new').value = '30';
+  applyDaysNew();
   var showLbl=map&&map.getZoom()>=ZOOM_THRESHOLD;
   DATA.forEach(function(p,i){ visible[i]=true; clusterGroup.addLayer(markers[i]); if(showLbl)labels[i].show(); else labels[i].hide(); });
   document.getElementById('visibleCount').textContent=DATA.length;
   document.getElementById('badge').textContent=DATA.length+' propiedades';
 }
+
+function applyDaysNew(){
+  var n = parseInt(document.getElementById('f-days-new').value, 10);
+  if(!Number.isFinite(n) || n < 1) n = 30;
+  DAYS_NEW = n;
+  if(!map || !markers.length) return;
+  DATA.forEach(function(p, i){
+    var nowNew = isNuevo(p);
+    var m = markers[i];
+    if(m._isNew !== nowNew){
+      m._isNew = nowNew;
+      m.setIcon(window._mkIcon(m._color, nowNew));
+      m.setPopupContent(window._buildPopupHtml(p, nowNew));
+    }
+    var lbl = labels[i];
+    if(lbl) lbl.setNew(nowNew);
+  });
+}
+
+// listener con debounce para el input de N
+(function(){
+  var t;
+  document.addEventListener('input', function(e){
+    if(e.target && e.target.id === 'f-days-new'){
+      clearTimeout(t);
+      t = setTimeout(applyDaysNew, 300);
+    }
+  });
+})();
 </script>
 <script>
 function fixHeight(){

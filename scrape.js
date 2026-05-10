@@ -58,7 +58,8 @@ function mapItem(p) {
     disposicion: p.disposicion || '',
     servicios: cleanArr(p.servicios),
     comodidades,
-    imagen: Array.isArray(p.imagenes) && p.imagenes.length ? p.imagenes[0] : null
+    imagen: Array.isArray(p.imagenes) && p.imagenes.length ? p.imagenes[0] : null,
+    fechaCreacion: p.fechaCreacion || null
   };
 }
 
@@ -77,7 +78,12 @@ function mapItem(p) {
   const mapped = filtered.map(mapItem).filter(Boolean);
   console.log(`Con lat/lng válida: ${mapped.length}`);
 
-  mapped.sort((a, b) => a.id - b.id);
+  // más recientes primero (las sin fecha al final)
+  mapped.sort((a, b) => {
+    const ta = a.fechaCreacion ? Date.parse(a.fechaCreacion) : 0;
+    const tb = b.fechaCreacion ? Date.parse(b.fechaCreacion) : 0;
+    return tb - ta;
+  });
 
   fs.writeFileSync('data.json', JSON.stringify(mapped));
   console.log(`data.json: ${(fs.statSync('data.json').size / 1024).toFixed(1)} KB`);
