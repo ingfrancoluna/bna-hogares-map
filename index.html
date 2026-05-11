@@ -112,14 +112,17 @@
     /* MARKERS */
     .marker-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
     .marker-dot.square{border-radius:2px}
+    .marker-dot.diamond{border-radius:0;transform:rotate(45deg)}
     .marker-dot.new{box-shadow:0 0 0 3px rgba(245,158,11,.85),0 1px 4px rgba(0,0,0,.4)}
     .legend-dot-sq{border-radius:2px !important}
+    .legend-dot-dm{border-radius:0 !important;transform:rotate(45deg)}
 
     /* POPUP IMAGE BADGE */
     .popup-img-wrap{position:relative}
     .popup-source-badge{position:absolute;top:6px;left:6px;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
     .popup-source-badge.bna{background:#1a3c5e}
     .popup-source-badge.argenprop{background:#15803d}
+    .popup-source-badge.zonaprop{background:#7e22ce}
     .popup-new-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
     .fp-row-inline{display:flex;gap:6px;align-items:center;font-size:11px;color:#555;margin-bottom:6px;flex-wrap:wrap}
     .fp-row-inline label{flex:1;min-width:0}
@@ -358,7 +361,8 @@ function loadData(){
   // Una entrada por archivo de fuente. Si falla uno, igual seguimos con el resto.
   var sources = [
     { id: 'bna',       url: './data-bna.json' },
-    { id: 'argenprop', url: './data-argenprop.json' }
+    { id: 'argenprop', url: './data-argenprop.json' },
+    { id: 'zonaprop',  url: './data-zonaprop.json' }
   ];
 
   Promise.all(sources.map(function(s){
@@ -431,7 +435,8 @@ var showOnlyNew = false;
 // 2) sumar una entrada acá con id, label y color
 var SOURCES = [
   { id: 'bna',       label: '\u{1F3DB}️ BNA',       color: '#1a3c5e' },
-  { id: 'argenprop', label: '\u{1F3E1} Argenprop', color: '#10b981' }
+  { id: 'argenprop', label: '\u{1F3E1} Argenprop', color: '#10b981' },
+  { id: 'zonaprop',  label: '\u{1F511} Zonaprop',  color: '#9333ea' }
 ];
 var activeSources = new Set(SOURCES.map(function(s){return s.id;}));
 var map, clusterGroup, markers=[], labels=[], visible=[];
@@ -477,7 +482,14 @@ function initMap(){
     return '#ef4444';
   }
   function fmtP(p,m){ if(!p)return'Consultar'; var pfx=(m||'USD')+' '; if(p>=1000000)return pfx+(p/1000000).toFixed(1)+'M'; if(p>=1000)return pfx+(p/1000).toFixed(0)+'K'; return pfx+p; }
-  function mkIcon(c, isNew, isSquare){ return L.divIcon({className:'',html:'<div class="marker-dot'+(isNew?' new':'')+(isSquare?' square':'')+'" style="background:'+c+'"></div>',iconSize:[12,12],iconAnchor:[6,6],popupAnchor:[0,-10]}); }
+  function mkIcon(c, isNew, shape){
+    var shapeCls = shape === 'square' ? ' square' : shape === 'diamond' ? ' diamond' : '';
+    return L.divIcon({
+      className:'',
+      html:'<div class="marker-dot'+(isNew?' new':'')+shapeCls+'" style="background:'+c+'"></div>',
+      iconSize:[12,12], iconAnchor:[6,6], popupAnchor:[0,-10]
+    });
+  }
   window._mkIcon = mkIcon;
 
   var LabelOverlay = L.Layer.extend({
@@ -500,7 +512,9 @@ function initMap(){
   function buildPopupHtml(p, isNew){
     var price=fmtP(p.precio,p.moneda);
     var fuenteId = p.fuente || 'bna';
-    var fuenteLabel = fuenteId === 'argenprop' ? 'Argenprop' : 'BNA';
+    var fuenteLabel = fuenteId === 'argenprop' ? 'Argenprop'
+                    : fuenteId === 'zonaprop'  ? 'Zonaprop'
+                    : 'BNA';
     var imgH = p.imagen
       ? '<div class="popup-img-wrap"><img class="popup-img" src="'+p.imagen+'" loading="lazy" onerror="this.style.display=\'none\'"><span class="popup-source-badge '+fuenteId+'">'+fuenteLabel+'</span></div>'
       : '';
@@ -514,11 +528,11 @@ function initMap(){
     var fechaH=fmtFechaHumana(p.fechaCreacion), fechaC=fmtFechaCorta(p.fechaCreacion);
     if(fechaH) body+='<div class="popup-row"><span class="popup-key">Publicado</span><span class="popup-val" title="'+(fechaC||'')+'">'+fechaH+pill+'</span></div>';
     body+='</div>';
-    var detailUrl = p.url
-      ? p.url
-      : (p.fuente === 'argenprop'
-          ? 'https://www.argenprop.com/casas/venta/cordoba'
-          : 'https://mashogaresconbna.com.ar/propiedad/'+p.id);
+    var fallbacks = {
+      argenprop: 'https://www.argenprop.com/casas/venta/cordoba',
+      zonaprop:  'https://www.zonaprop.com.ar/casas-venta-cordoba.html'
+    };
+    var detailUrl = p.url || fallbacks[p.fuente] || 'https://mashogaresconbna.com.ar/propiedad/'+p.id;
     return imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="'+detailUrl+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
   }
   window._buildPopupHtml = buildPopupHtml;
@@ -528,9 +542,9 @@ function initMap(){
   DATA.forEach(function(p,i){
     var color=getColor(p), price=fmtP(p.precio,p.moneda), ll=L.latLng(p.lat,p.lng);
     var nuevo = isNuevo(p);
-    var square = p.fuente === 'argenprop';
-    var m=L.marker(ll,{icon:mkIcon(color, nuevo, square)});
-    m._color=color; m._isNew=nuevo; m._isSquare=square;
+    var shape = p.fuente === 'argenprop' ? 'square' : (p.fuente === 'zonaprop' ? 'diamond' : 'circle');
+    var m=L.marker(ll,{icon:mkIcon(color, nuevo, shape)});
+    m._color=color; m._isNew=nuevo; m._shape=shape;
     m.bindPopup(buildPopupHtml(p, nuevo),{maxWidth:270});
     clusterGroup.addLayer(m);
     markers.push(m); visible.push(true);
@@ -555,7 +569,8 @@ function initMap(){
       '<div style="height:6px"></div>'+
       '<b>Fuente</b>'+
       '<div class="legend-item"><div class="legend-dot" style="background:#555"></div>BNA</div>'+
-      '<div class="legend-item"><div class="legend-dot legend-dot-sq" style="background:#555"></div>Argenprop</div>';
+      '<div class="legend-item"><div class="legend-dot legend-dot-sq" style="background:#555"></div>Argenprop</div>'+
+      '<div class="legend-item"><div class="legend-dot legend-dot-dm" style="background:#555"></div>Zonaprop</div>';
     return d;
   };
   legend.addTo(map);
@@ -658,7 +673,7 @@ function applyDaysNew(){
     var m = markers[i];
     if(m._isNew !== nowNew){
       m._isNew = nowNew;
-      m.setIcon(window._mkIcon(m._color, nowNew, m._isSquare));
+      m.setIcon(window._mkIcon(m._color, nowNew, m._shape));
       m.setPopupContent(window._buildPopupHtml(p, nowNew));
     }
     var lbl = labels[i];
