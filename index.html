@@ -495,7 +495,12 @@ function initMap(){
     var fechaH=fmtFechaHumana(p.fechaCreacion), fechaC=fmtFechaCorta(p.fechaCreacion);
     if(fechaH) body+='<div class="popup-row"><span class="popup-key">Publicado</span><span class="popup-val" title="'+(fechaC||'')+'">'+fechaH+pill+'</span></div>';
     body+='</div>';
-    return imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="https://mashogaresconbna.com.ar/propiedad/'+p.id+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
+    var detailUrl = p.url
+      ? p.url
+      : (p.fuente === 'argenprop'
+          ? 'https://www.argenprop.com/casas/venta/cordoba'
+          : 'https://mashogaresconbna.com.ar/propiedad/'+p.id);
+    return imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="'+detailUrl+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
   }
   window._buildPopupHtml = buildPopupHtml;
 

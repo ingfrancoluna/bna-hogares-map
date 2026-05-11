@@ -109,8 +109,12 @@ function parseCard(html, id) {
     }
   }
 
+  const hrefM = html.match(/href="(\/casa-en-venta-en-[^"]+?--\d+)"/);
+  const url = hrefM ? `${BASE}${hrefM[1].replace(/&amp;/g, '&')}` : null;
+
   return {
     id: parseInt(id, 10),
+    url,
     titulo: titulo || locTitle,
     precio: monto,
     moneda,
@@ -224,6 +228,7 @@ function saveCache(cache) {
       geoHits++;
       result.push({
         id: item.id,
+        url: item.url,
         titulo: item.titulo || item.locTitle || '',
         lat: coords.lat,
         lng: coords.lng,
