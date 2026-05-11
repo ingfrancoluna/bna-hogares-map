@@ -209,7 +209,7 @@
           <div class="fp-section-title">Antigüedad de publicación</div>
           <div class="fp-row-inline">
             <label>Marcar como nuevas las últimas</label>
-            <input type="number" id="f-days-new" min="1" value="30">
+            <input type="number" id="f-days-new" min="1" value="7">
             <span>días</span>
           </div>
           <div class="fp-row-inline">
@@ -441,7 +441,7 @@ document.addEventListener('change', function(e){
 // ── Map ──────────────────────────────────────────────────────────────────
 var ZOOM_THRESHOLD = 13;
 var DATA = [];
-var DAYS_NEW = 30;
+var DAYS_NEW = 7;
 var showOnlyNew = false;
 
 // Lista de fuentes disponibles. Para agregar una nueva integración:
@@ -582,7 +582,7 @@ function initMap(){
   function showLblFlag(){ return map.getZoom() >= ZOOM_THRESHOLD; }
 
   // Núcleo: renderiza sólo lo que está en viewport + pasa el filtro (con cap)
-  var MAX_RENDER = 3000;
+  var MAX_RENDER = 5000;
   function renderViewport(){
     var b = map.getBounds().pad(viewportPad);
     var showLbl = showLblFlag();
@@ -592,16 +592,43 @@ function initMap(){
       if (!filterState.pasa(p)) continue;
       if (b.contains([p.lat, p.lng])) candidates.push(i);
     }
-    // Si hay demasiados (zoom out extremo), priorizar los más cercanos al centro
+    // Si hay demasiados, repartir fair entre fuentes (round-robin por cercanía al centro)
     if (candidates.length > MAX_RENDER) {
       var c = map.getCenter();
-      candidates.sort(function(a, b){
-        var pa = DATA[a], pb = DATA[b];
-        var da = (pa.lat - c.lat) * (pa.lat - c.lat) + (pa.lng - c.lng) * (pa.lng - c.lng);
-        var db = (pb.lat - c.lat) * (pb.lat - c.lat) + (pb.lng - c.lng) * (pb.lng - c.lng);
-        return da - db;
+      var groups = {};
+      for (var k = 0; k < candidates.length; k++) {
+        var idx = candidates[k];
+        var src = DATA[idx].fuente || 'bna';
+        if (!groups[src]) groups[src] = [];
+        groups[src].push(idx);
+      }
+      // ordenar cada grupo por distancia al centro
+      Object.keys(groups).forEach(function(s){
+        groups[s].sort(function(a, bb){
+          var pa = DATA[a], pb = DATA[bb];
+          var da = (pa.lat - c.lat) * (pa.lat - c.lat) + (pa.lng - c.lng) * (pa.lng - c.lng);
+          var db = (pb.lat - c.lat) * (pb.lat - c.lat) + (pb.lng - c.lng) * (pb.lng - c.lng);
+          return da - db;
+        });
       });
-      candidates = candidates.slice(0, MAX_RENDER);
+      // round-robin: una de cada fuente hasta llenar MAX_RENDER
+      var srcs = Object.keys(groups);
+      var pos = {};
+      srcs.forEach(function(s){ pos[s] = 0; });
+      var picked = [];
+      while (picked.length < MAX_RENDER) {
+        var added = false;
+        for (var si = 0; si < srcs.length; si++) {
+          var s = srcs[si];
+          if (pos[s] < groups[s].length) {
+            picked.push(groups[s][pos[s]++]);
+            added = true;
+            if (picked.length >= MAX_RENDER) break;
+          }
+        }
+        if (!added) break;
+      }
+      candidates = picked;
     }
     var keep = new Set(candidates);
 
@@ -781,8 +808,8 @@ function updateClearBtnVisibility(){
 function resetFilters(){
   document.querySelectorAll('#fp-body input[type=number], #fp-body input[type=text]').forEach(function(el){el.value='';});
   document.querySelectorAll('#fp-body input[type=checkbox]').forEach(function(el){el.checked=false; el.closest('.fp-check').classList.remove('checked');});
-  document.getElementById('f-days-new').value = '30';
-  DAYS_NEW = 30;
+  document.getElementById('f-days-new').value = '7';
+  DAYS_NEW = 7;
   if(showOnlyNew){
     showOnlyNew = false;
     var btn = document.getElementById('only-new-btn');
@@ -816,7 +843,7 @@ function refreshMarkersIsNew(){
 
 function applyDaysNew(){
   var n = parseInt(document.getElementById('f-days-new').value, 10);
-  if (!Number.isFinite(n) || n < 1) n = 30;
+  if (!Number.isFinite(n) || n < 1) n = 7;
   DAYS_NEW = n;
   if (!map) return;
   refreshMarkersIsNew();
