@@ -95,11 +95,17 @@ function parseCard(html, id) {
 
   let localidad = '';
   if (locTitle) {
-    const m = locTitle.match(/(?:Venta|venta|Casa)[^,]*?en\s+([^,]+),/i);
-    if (m) localidad = m[1].trim();
-    else {
-      const parts = locTitle.split(',');
-      if (parts.length >= 2) localidad = parts[parts.length - 2].trim();
+    // Patrón típico: "Casa en Venta en <LOCALIDAD>, <CIUDAD/PROVINCIA>"
+    // Buscar el ÚLTIMO " en " y tomar lo que sigue hasta la primera coma.
+    const idx = locTitle.lastIndexOf(' en ');
+    if (idx >= 0) {
+      const tail = locTitle.slice(idx + 4);
+      const m = tail.match(/^([^,]+)/);
+      if (m) localidad = m[1].trim();
+    }
+    if (!localidad) {
+      const parts = locTitle.split(',').map(s => s.trim()).filter(Boolean);
+      if (parts.length >= 2) localidad = parts[parts.length - 2];
     }
   }
 
