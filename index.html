@@ -106,13 +106,20 @@
 
     /* PRICE LABEL */
     .price-label{background:rgba(0,0,0,.65);color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;font-weight:700;white-space:nowrap;pointer-events:none;transform:translate(-50%,-170%);position:absolute;display:none;font-family:Arial,sans-serif}
-    .price-label.src-argenprop{background:rgba(20,83,45,.85)}
     .price-label.new{background:#f59e0b}
     .price-label.new::after{content:" \01F195"}
 
-    /* NEW BADGE */
+    /* MARKERS */
     .marker-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+    .marker-dot.square{border-radius:2px}
     .marker-dot.new{box-shadow:0 0 0 3px rgba(245,158,11,.85),0 1px 4px rgba(0,0,0,.4)}
+    .legend-dot-sq{border-radius:2px !important}
+
+    /* POPUP IMAGE BADGE */
+    .popup-img-wrap{position:relative}
+    .popup-source-badge{position:absolute;top:6px;left:6px;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+    .popup-source-badge.bna{background:#1a3c5e}
+    .popup-source-badge.argenprop{background:#15803d}
     .popup-new-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
     .fp-row-inline{display:flex;gap:6px;align-items:center;font-size:11px;color:#555;margin-bottom:6px;flex-wrap:wrap}
     .fp-row-inline label{flex:1;min-width:0}
@@ -462,28 +469,23 @@ function initMap(){
     maxZoom:19
   }).addTo(map);
 
-  var PALETTES = {
-    bna:       ['#22c55e','#3b82f6','#f97316','#ef4444'],
-    argenprop: ['#bbf7d0','#4ade80','#16a34a','#14532d']
-  };
   function getColor(p){
-    var pal = PALETTES[p.fuente] || PALETTES.bna;
     var v = p.precio;
-    if(!v || v<80000) return pal[0];
-    if(v<150000) return pal[1];
-    if(v<220000) return pal[2];
-    return pal[3];
+    if(!v || v<80000) return '#22c55e';
+    if(v<150000) return '#3b82f6';
+    if(v<220000) return '#f97316';
+    return '#ef4444';
   }
   function fmtP(p,m){ if(!p)return'Consultar'; var pfx=(m||'USD')+' '; if(p>=1000000)return pfx+(p/1000000).toFixed(1)+'M'; if(p>=1000)return pfx+(p/1000).toFixed(0)+'K'; return pfx+p; }
-  function mkIcon(c, isNew){ return L.divIcon({className:'',html:'<div class="marker-dot'+(isNew?' new':'')+'" style="background:'+c+'"></div>',iconSize:[12,12],iconAnchor:[6,6],popupAnchor:[0,-10]}); }
+  function mkIcon(c, isNew, isSquare){ return L.divIcon({className:'',html:'<div class="marker-dot'+(isNew?' new':'')+(isSquare?' square':'')+'" style="background:'+c+'"></div>',iconSize:[12,12],iconAnchor:[6,6],popupAnchor:[0,-10]}); }
   window._mkIcon = mkIcon;
 
   var LabelOverlay = L.Layer.extend({
-    initialize:function(ll,t,isNew,fuente){this._ll=ll;this._t=t;this._isNew=!!isNew;this._fuente=fuente||'';},
+    initialize:function(ll,t,isNew){this._ll=ll;this._t=t;this._isNew=!!isNew;},
     onAdd:function(m){
       this._map=m;
       var d=document.createElement('div');
-      d.className='price-label'+(this._isNew?' new':'')+(this._fuente?' src-'+this._fuente:'');
+      d.className='price-label'+(this._isNew?' new':'');
       d.textContent=this._t; this._el=d;
       m.getPanes().overlayPane.appendChild(d);
       m.on('zoom viewreset moveend',this._upd,this); this._upd();
@@ -497,7 +499,11 @@ function initMap(){
 
   function buildPopupHtml(p, isNew){
     var price=fmtP(p.precio,p.moneda);
-    var imgH=p.imagen?'<img class="popup-img" src="'+p.imagen+'" loading="lazy" onerror="this.style.display=\'none\'">':'';
+    var fuenteId = p.fuente || 'bna';
+    var fuenteLabel = fuenteId === 'argenprop' ? 'Argenprop' : 'BNA';
+    var imgH = p.imagen
+      ? '<div class="popup-img-wrap"><img class="popup-img" src="'+p.imagen+'" loading="lazy" onerror="this.style.display=\'none\'"><span class="popup-source-badge '+fuenteId+'">'+fuenteLabel+'</span></div>'
+      : '';
     var pill=isNew?'<span class="popup-new-pill">Nueva</span>':'';
     var body='<div class="popup-body"><div class="popup-addr">&#128205; '+(p.direccion||p.localidad+', Córdoba')+'</div>';
     if(p.localidad) body+='<div class="popup-row"><span class="popup-key">Localidad</span><span class="popup-val">'+p.localidad+'</span></div>';
@@ -522,12 +528,13 @@ function initMap(){
   DATA.forEach(function(p,i){
     var color=getColor(p), price=fmtP(p.precio,p.moneda), ll=L.latLng(p.lat,p.lng);
     var nuevo = isNuevo(p);
-    var m=L.marker(ll,{icon:mkIcon(color, nuevo)});
-    m._color=color; m._isNew=nuevo;
+    var square = p.fuente === 'argenprop';
+    var m=L.marker(ll,{icon:mkIcon(color, nuevo, square)});
+    m._color=color; m._isNew=nuevo; m._isSquare=square;
     m.bindPopup(buildPopupHtml(p, nuevo),{maxWidth:270});
     clusterGroup.addLayer(m);
     markers.push(m); visible.push(true);
-    var lbl=new LabelOverlay(ll,price,nuevo,p.fuente||'bna'); lbl.addTo(map); labels.push(lbl);
+    var lbl=new LabelOverlay(ll,price,nuevo); lbl.addTo(map); labels.push(lbl);
   });
 
   map.addLayer(clusterGroup);
@@ -539,13 +546,16 @@ function initMap(){
   var legend=L.control({position:'bottomright'});
   legend.onAdd=function(){
     var d = L.DomUtil.create('div','legend');
-    var ranges = ['Hasta 80.000','80.001–150.000','150.001–220.000','Más de 220.000'];
-    function block(titulo, pal){
-      var h = '<b>'+titulo+' (USD)</b>';
-      for(var i=0;i<4;i++) h += '<div class="legend-item"><div class="legend-dot" style="background:'+pal[i]+'"></div>'+ranges[i]+'</div>';
-      return h;
-    }
-    d.innerHTML = block('BNA', PALETTES.bna) + '<div style="height:6px"></div>' + block('Argenprop', PALETTES.argenprop);
+    d.innerHTML =
+      '<b>Precio (USD)</b>'+
+      '<div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Hasta 80.000</div>'+
+      '<div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>80.001–150.000</div>'+
+      '<div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>150.001–220.000</div>'+
+      '<div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Más de 220.000</div>'+
+      '<div style="height:6px"></div>'+
+      '<b>Fuente</b>'+
+      '<div class="legend-item"><div class="legend-dot" style="background:#555"></div>BNA</div>'+
+      '<div class="legend-item"><div class="legend-dot legend-dot-sq" style="background:#555"></div>Argenprop</div>';
     return d;
   };
   legend.addTo(map);
@@ -648,7 +658,7 @@ function applyDaysNew(){
     var m = markers[i];
     if(m._isNew !== nowNew){
       m._isNew = nowNew;
-      m.setIcon(window._mkIcon(m._color, nowNew));
+      m.setIcon(window._mkIcon(m._color, nowNew, m._isSquare));
       m.setPopupContent(window._buildPopupHtml(p, nowNew));
     }
     var lbl = labels[i];
