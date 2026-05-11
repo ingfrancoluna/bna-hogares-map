@@ -106,6 +106,7 @@
 
     /* PRICE LABEL */
     .price-label{background:rgba(0,0,0,.65);color:#fff;padding:2px 5px;border-radius:3px;font-size:10px;font-weight:700;white-space:nowrap;pointer-events:none;transform:translate(-50%,-170%);position:absolute;display:none;font-family:Arial,sans-serif}
+    .price-label.src-argenprop{background:rgba(20,83,45,.85)}
     .price-label.new{background:#f59e0b}
     .price-label.new::after{content:" \01F195"}
 
@@ -461,17 +462,29 @@ function initMap(){
     maxZoom:19
   }).addTo(map);
 
-  function getColor(p){ if(!p||p<80000)return'#22c55e'; if(p<150000)return'#3b82f6'; if(p<220000)return'#f97316'; return'#ef4444'; }
+  var PALETTES = {
+    bna:       ['#22c55e','#3b82f6','#f97316','#ef4444'],
+    argenprop: ['#bbf7d0','#4ade80','#16a34a','#14532d']
+  };
+  function getColor(p){
+    var pal = PALETTES[p.fuente] || PALETTES.bna;
+    var v = p.precio;
+    if(!v || v<80000) return pal[0];
+    if(v<150000) return pal[1];
+    if(v<220000) return pal[2];
+    return pal[3];
+  }
   function fmtP(p,m){ if(!p)return'Consultar'; var pfx=(m||'USD')+' '; if(p>=1000000)return pfx+(p/1000000).toFixed(1)+'M'; if(p>=1000)return pfx+(p/1000).toFixed(0)+'K'; return pfx+p; }
   function mkIcon(c, isNew){ return L.divIcon({className:'',html:'<div class="marker-dot'+(isNew?' new':'')+'" style="background:'+c+'"></div>',iconSize:[12,12],iconAnchor:[6,6],popupAnchor:[0,-10]}); }
   window._mkIcon = mkIcon;
 
   var LabelOverlay = L.Layer.extend({
-    initialize:function(ll,t,isNew){this._ll=ll;this._t=t;this._isNew=!!isNew;},
+    initialize:function(ll,t,isNew,fuente){this._ll=ll;this._t=t;this._isNew=!!isNew;this._fuente=fuente||'';},
     onAdd:function(m){
       this._map=m;
       var d=document.createElement('div');
-      d.className='price-label'+(this._isNew?' new':''); d.textContent=this._t; this._el=d;
+      d.className='price-label'+(this._isNew?' new':'')+(this._fuente?' src-'+this._fuente:'');
+      d.textContent=this._t; this._el=d;
       m.getPanes().overlayPane.appendChild(d);
       m.on('zoom viewreset moveend',this._upd,this); this._upd();
     },
@@ -507,14 +520,14 @@ function initMap(){
   clusterGroup = L.markerClusterGroup({chunkedLoading:true, maxClusterRadius:50});
 
   DATA.forEach(function(p,i){
-    var color=getColor(p.precio), price=fmtP(p.precio,p.moneda), ll=L.latLng(p.lat,p.lng);
+    var color=getColor(p), price=fmtP(p.precio,p.moneda), ll=L.latLng(p.lat,p.lng);
     var nuevo = isNuevo(p);
     var m=L.marker(ll,{icon:mkIcon(color, nuevo)});
     m._color=color; m._isNew=nuevo;
     m.bindPopup(buildPopupHtml(p, nuevo),{maxWidth:270});
     clusterGroup.addLayer(m);
     markers.push(m); visible.push(true);
-    var lbl=new LabelOverlay(ll,price,nuevo); lbl.addTo(map); labels.push(lbl);
+    var lbl=new LabelOverlay(ll,price,nuevo,p.fuente||'bna'); lbl.addTo(map); labels.push(lbl);
   });
 
   map.addLayer(clusterGroup);
@@ -524,7 +537,17 @@ function initMap(){
   map.on('zoomend',updateLabels); clusterGroup.on('animationend',updateLabels); updateLabels();
 
   var legend=L.control({position:'bottomright'});
-  legend.onAdd=function(){ var d=L.DomUtil.create('div','legend'); d.innerHTML='<b>Precio (USD)</b><div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Hasta 80.000</div><div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>80.001–150.000</div><div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>150.001–220.000</div><div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Más de 220.000</div>'; return d; };
+  legend.onAdd=function(){
+    var d = L.DomUtil.create('div','legend');
+    var ranges = ['Hasta 80.000','80.001–150.000','150.001–220.000','Más de 220.000'];
+    function block(titulo, pal){
+      var h = '<b>'+titulo+' (USD)</b>';
+      for(var i=0;i<4;i++) h += '<div class="legend-item"><div class="legend-dot" style="background:'+pal[i]+'"></div>'+ranges[i]+'</div>';
+      return h;
+    }
+    d.innerHTML = block('BNA', PALETTES.bna) + '<div style="height:6px"></div>' + block('Argenprop', PALETTES.argenprop);
+    return d;
+  };
   legend.addTo(map);
 }
 
