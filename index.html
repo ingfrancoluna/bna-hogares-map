@@ -154,6 +154,9 @@
     .legend{background:#fff;padding:8px 12px;border-radius:7px;box-shadow:0 2px 6px rgba(0,0,0,.2);font-size:11px}
     .legend b{display:block;margin-bottom:5px}
     .legend-item{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+    .legend-item.price-bucket{cursor:pointer;user-select:none;padding:1px 4px;border-radius:4px;margin-left:-4px;transition:background .12s}
+    .legend-item.price-bucket:hover{background:#f1f5f9}
+    .legend-item.price-bucket.off{opacity:.4;text-decoration:line-through}
     .legend-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
 
     @media(max-width:600px){
@@ -465,6 +468,28 @@ var SOURCES = [
   { id: 'lavoz',     label: '\u{1F4F0} La Voz',    color: '#0891b2' }
 ];
 var activeSources = new Set(SOURCES.map(function(s){return s.id;}));
+var PRICE_BUCKETS = [
+  {id:'b1', max:  80000,   color:'#22c55e', label:'Hasta 80.000'},
+  {id:'b2', max: 100000,   color:'#84cc16', label:'80.001–100.000'},
+  {id:'b3', max: 120000,   color:'#eab308', label:'100.001–120.000'},
+  {id:'b4', max: 140000,   color:'#f59e0b', label:'120.001–140.000'},
+  {id:'b5', max: 160000,   color:'#f97316', label:'140.001–160.000'},
+  {id:'b6', max: 180000,   color:'#ef4444', label:'160.001–180.000'},
+  {id:'b7', max: Infinity, color:'#991b1b', label:'Más de 180.000'}
+];
+var ALL_BUCKET_IDS = PRICE_BUCKETS.map(function(b){return b.id;});
+var activePriceBuckets = new Set(ALL_BUCKET_IDS);
+function priceBucket(p){
+  var v = p.precio || 0;
+  for (var i=0; i<PRICE_BUCKETS.length; i++){
+    if (v <= PRICE_BUCKETS[i].max) return PRICE_BUCKETS[i].id;
+  }
+  return PRICE_BUCKETS[PRICE_BUCKETS.length-1].id;
+}
+function bucketColor(id){
+  for (var i=0; i<PRICE_BUCKETS.length; i++) if (PRICE_BUCKETS[i].id === id) return PRICE_BUCKETS[i].color;
+  return '#22c55e';
+}
 var map, clusterGroup;
 var markersById = {};   // sparse: sólo markers visibles en viewport
 var labelsById  = {};
@@ -505,13 +530,7 @@ function initMap(){
     maxZoom:19
   }).addTo(map);
 
-  function getColor(p){
-    var v = p.precio;
-    if(!v || v<80000) return '#22c55e';
-    if(v<150000) return '#3b82f6';
-    if(v<220000) return '#f97316';
-    return '#ef4444';
-  }
+  function getColor(p){ return bucketColor(priceBucket(p)); }
   function fmtP(p,m){ if(!p)return'Consultar'; var pfx=(m||'USD')+' '; if(p>=1000000)return pfx+(p/1000000).toFixed(1)+'M'; if(p>=1000)return pfx+(p/1000).toFixed(0)+'K'; return pfx+p; }
   function mkIcon(c, isNew, shape){
     var shapeCls = shape === 'square' ? ' square'
@@ -707,18 +726,31 @@ function initMap(){
   var legend=L.control({position:'bottomright'});
   legend.onAdd=function(){
     var d = L.DomUtil.create('div','legend');
+    var bucketsHtml = PRICE_BUCKETS.map(function(b){
+      var off = activePriceBuckets.has(b.id) ? '' : ' off';
+      return '<div class="legend-item price-bucket'+off+'" data-bucket="'+b.id+'" title="Click para filtrar">'+
+             '<div class="legend-dot" style="background:'+b.color+'"></div>'+b.label+'</div>';
+    }).join('');
     d.innerHTML =
-      '<b>Precio (USD)</b>'+
-      '<div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Hasta 80.000</div>'+
-      '<div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>80.001–150.000</div>'+
-      '<div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>150.001–220.000</div>'+
-      '<div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Más de 220.000</div>'+
+      '<b>Precio (USD)</b>'+ bucketsHtml +
       '<div style="height:6px"></div>'+
       '<b>Fuente</b>'+
       '<div class="legend-item"><div class="legend-dot" style="background:#555"></div>BNA</div>'+
       '<div class="legend-item"><div class="legend-dot legend-dot-sq" style="background:#555"></div>Argenprop</div>'+
       '<div class="legend-item"><div class="legend-dot legend-dot-dm" style="background:#555"></div>Zonaprop</div>'+
       '<div class="legend-item"><div class="legend-dot legend-dot-tr" style="background:#555"></div>La Voz</div>';
+
+    L.DomEvent.disableClickPropagation(d);
+    L.DomEvent.disableScrollPropagation(d);
+    d.addEventListener('click', function(ev){
+      var item = ev.target.closest('.price-bucket');
+      if (!item) return;
+      var b = item.dataset.bucket;
+      if (activePriceBuckets.has(b)) activePriceBuckets.delete(b);
+      else activePriceBuckets.add(b);
+      item.classList.toggle('off');
+      applyFilters();
+    });
     return d;
   };
   legend.addTo(map);
@@ -758,6 +790,7 @@ function buildFilterPredicate(){
 
   return function(p){
     if (!activeSources.has(p.fuente || 'bna')) return false;
+    if (!activePriceBuckets.has(priceBucket(p))) return false;
     if (p.precio != null && (p.precio < pmin || p.precio > pmax)) return false;
     if (p.dormitorios != null && (p.dormitorios < dmin || p.dormitorios > dmax)) return false;
     if (p.banos != null && (p.banos < bmin || p.banos > bmax)) return false;
@@ -839,6 +872,8 @@ function resetFilters(){
     if(btn){ btn.classList.remove('active'); btn.setAttribute('aria-pressed','false'); }
   }
   activeSources = new Set(SOURCES.map(function(s){return s.id;}));
+  activePriceBuckets = new Set(ALL_BUCKET_IDS);
+  document.querySelectorAll('.legend-item.price-bucket').forEach(function(el){ el.classList.remove('off'); });
   SOURCES.forEach(function(s){
     var sb = document.querySelector('.src-btn[data-src="'+s.id+'"]');
     if(sb) paintSrcBtn(sb, s, true);
