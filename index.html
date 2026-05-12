@@ -396,7 +396,7 @@ function loadData(){
       window._countBySource[f] = (window._countBySource[f] || 0) + 1;
     });
     document.getElementById('totalCount').textContent = n;
-    document.getElementById('visibleCount').textContent = n;
+    document.getElementById('visibleCount').textContent = 0;
     document.getElementById('badge').textContent = n + ' propiedades';
     renderSourceButtons();
     loader.classList.add('hidden');
@@ -662,6 +662,8 @@ function initMap(){
       b2.label.addTo(map);
       if (showLbl) b2.label.show(); else b2.label.hide();
     });
+
+    document.getElementById('visibleCount').textContent = keep.size;
   }
   window._renderViewport = renderViewport;
 
@@ -773,7 +775,6 @@ function applyFilters(){
   var count = 0;
   for (var i = 0; i < DATA.length; i++) if (pasa(DATA[i])) count++;
   filterState = { pasa: pasa, totalVisible: count };
-  document.getElementById('visibleCount').textContent = count;
   document.getElementById('badge').textContent = count + ' propiedades';
   if (window._renderViewport) {
     window._renderViewport();
@@ -801,6 +802,7 @@ function clearMap(){
   markersById = {};
   labelsById = {};
   window._lastRenderedBounds = null;
+  document.getElementById('visibleCount').textContent = 0;
   document.getElementById('search-here-btn').classList.remove('hidden');
   updateClearBtnVisibility();
 }
