@@ -49,6 +49,7 @@
     #only-new-btn.active:hover{background:#d97706}
     .source-buttons{display:flex;gap:6px;flex-wrap:wrap}
     .src-btn{background:#fff;border:1.5px solid;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;opacity:.7}
+    .src-btn .src-count{font-size:10px;font-weight:600;opacity:.7;margin-left:4px}
     .src-btn.active{opacity:1;color:#fff !important}
     .src-btn:hover{opacity:1}
 
@@ -388,6 +389,12 @@ function loadData(){
     DATA = [].concat.apply([], parts);
     var n = DATA.length;
     if (n === 0) throw new Error('No se cargó ninguna fuente');
+    // Precalcular total por fuente para mostrarlo en los botones
+    window._countBySource = {};
+    DATA.forEach(function(p){
+      var f = p.fuente || 'bna';
+      window._countBySource[f] = (window._countBySource[f] || 0) + 1;
+    });
     document.getElementById('totalCount').textContent = n;
     document.getElementById('visibleCount').textContent = n;
     document.getElementById('badge').textContent = n + ' propiedades';
@@ -582,7 +589,7 @@ function initMap(){
   function showLblFlag(){ return map.getZoom() >= ZOOM_THRESHOLD; }
 
   // Núcleo: renderiza sólo lo que está en viewport + pasa el filtro (con cap)
-  var MAX_RENDER = 5000;
+  var MAX_RENDER = 10000;
   function renderViewport(){
     var b = map.getBounds().pad(viewportPad);
     var showLbl = showLblFlag();
@@ -874,7 +881,9 @@ function renderSourceButtons(){
     var btn = document.createElement('button');
     btn.className = 'src-btn';
     btn.dataset.src = s.id;
-    btn.innerHTML = s.label;
+    var count = (window._countBySource || {})[s.id];
+    var countHtml = count ? ' <span class="src-count">'+count.toLocaleString('es-AR')+'</span>' : '';
+    btn.innerHTML = s.label + countHtml;
     btn.title = 'Mostrar/ocultar propiedades de ' + s.id.toUpperCase();
     btn.addEventListener('click', function(){ toggleSource(s.id); });
     paintSrcBtn(btn, s, activeSources.has(s.id));
