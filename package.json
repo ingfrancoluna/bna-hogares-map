@@ -4,5 +4,8 @@
   "private": true,
   "scripts": {
     "scrape": "node scrape.js"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
   }
 }

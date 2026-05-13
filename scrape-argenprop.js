@@ -1,33 +1,38 @@
 const fs = require('fs');
+const { chromium } = require('playwright');
 
 const BASE = 'https://www.argenprop.com';
 const LISTING_PATH = '/casas/venta/cordoba';
 const PROVINCIA = 'Córdoba';
 const FUENTE = 'argenprop';
 
-const UA_BROWSER = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36';
+// UA real de Chrome 131 en Windows — Playwright lo respeta vía contextOptions.userAgent
+const UA_BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
 const NOMINATIM_UA = 'bna-hogares-map/0.1 (https://github.com/ingfrancoluna/bna-hogares-map; fluna@pagos360.com)';
 
 const OUT_FILE = 'data-argenprop.json';
 const CACHE_FILE = 'geocode-cache.json';
 
-const PAGE_THROTTLE_MS = 500;
+const PAGE_THROTTLE_MS = 300;
 const NOMINATIM_THROTTLE_MS = 1100;
+const NAV_TIMEOUT_MS = 45000;
+const LISTING_WAIT_MS = 20000;
 const MAX_PAGES = parseInt(process.env.MAX_PAGES || '0', 10);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function fetchHtml(url) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': UA_BROWSER,
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'es-AR,es;q=0.9'
-    }
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} en ${url}`);
-  return res.text();
+// Argenprop usa AWS WAF: tras unos pocos requests anónimos sirve una página de challenge
+// que requiere ejecutar JS. Por eso navegamos con Chromium headless (que sí ejecuta el JS
+// y persiste el cookie aws-waf-token en el context para los pedidos siguientes).
+async function fetchHtmlBrowser(page, url) {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+  // Si AWS WAF interpone su challenge, el script hace location.reload tras resolverlo:
+  // esperamos a que aparezca el listing real (o timeout, devolviendo lo que haya).
+  try {
+    await page.waitForSelector('.listing__item', { timeout: LISTING_WAIT_MS });
+  } catch {}
+  return await page.content();
 }
 
 function decodeEntities(s) {
@@ -190,36 +195,41 @@ function saveCache(cache) {
   const cache = loadCache();
   console.log(`Cache geocoding: ${Object.keys(cache).length} entradas`);
 
+  console.log('Lanzando Chromium headless...');
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    userAgent: UA_BROWSER,
+    locale: 'es-AR',
+    viewport: { width: 1280, height: 800 }
+  });
+  const page = await context.newPage();
+
   console.log('Bajando primera página...');
-  const firstHtml = await fetchHtml(`${BASE}${LISTING_PATH}?pagina-1`);
+  const firstHtml = await fetchHtmlBrowser(page, `${BASE}${LISTING_PATH}?pagina-1`);
   let totalPages = parseTotalPages(firstHtml);
   if (MAX_PAGES > 0) totalPages = Math.min(totalPages, MAX_PAGES);
   console.log(`Páginas a recorrer: ${totalPages}`);
 
   const byId = new Map();
   parseCards(firstHtml).forEach(c => byId.set(c.id, c));
+  console.log(`  page 1/${totalPages}: cards=${byId.size} totalUnicos=${byId.size} htmlBytes=${firstHtml.length}`);
 
-  let blockedDumped = false;
   for (let p = 2; p <= totalPages; p++) {
     await sleep(PAGE_THROTTLE_MS);
     try {
-      const html = await fetchHtml(`${BASE}${LISTING_PATH}?pagina-${p}`);
+      const html = await fetchHtmlBrowser(page, `${BASE}${LISTING_PATH}?pagina-${p}`);
       const cards = parseCards(html);
       const beforeSize = byId.size;
       cards.forEach(c => byId.set(c.id, c));
       const firstId = cards[0] ? cards[0].id : '-';
       const newOnes = byId.size - beforeSize;
       console.log(`  page ${p}/${totalPages}: cards=${cards.length} firstId=${firstId} new=${newOnes} totalUnicos=${byId.size} htmlBytes=${html.length}`);
-      if (!blockedDumped && cards.length === 0 && html.length < 10000) {
-        blockedDumped = true;
-        console.log(`\n========== DUMP HTML BLOQUEADO (page ${p}, ${html.length} bytes) ==========`);
-        console.log(html);
-        console.log(`========== FIN DUMP ==========\n`);
-      }
     } catch (e) {
       console.error(`  page ${p} ERROR:`, e.message);
     }
   }
+
+  await browser.close();
 
   const items = [...byId.values()];
   console.log(`\nCards únicas: ${items.length}`);
