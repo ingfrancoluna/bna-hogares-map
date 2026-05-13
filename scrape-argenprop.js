@@ -204,8 +204,11 @@ function saveCache(cache) {
     try {
       const html = await fetchHtml(`${BASE}${LISTING_PATH}?pagina-${p}`);
       const cards = parseCards(html);
+      const beforeSize = byId.size;
       cards.forEach(c => byId.set(c.id, c));
-      if (p % 10 === 0 || p === totalPages) console.log(`  page ${p}/${totalPages} → total únicos ${byId.size}`);
+      const firstId = cards[0] ? cards[0].id : '-';
+      const newOnes = byId.size - beforeSize;
+      console.log(`  page ${p}/${totalPages}: cards=${cards.length} firstId=${firstId} new=${newOnes} totalUnicos=${byId.size} htmlBytes=${html.length}`);
     } catch (e) {
       console.error(`  page ${p} ERROR:`, e.message);
     }
