@@ -11,7 +11,7 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -35,11 +35,15 @@ jobs:
         run: node scrape-lavoz.js
         continue-on-error: true
 
+      - name: Run CordobaProp scraper
+        run: node scrape-cordobaprop.js
+        continue-on-error: true
+
       - name: Commit data files if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data-bna.json data-argenprop.json data-zonaprop.json data-lavoz.json geocode-cache.json 2>/dev/null || true
+          git add data-bna.json data-argenprop.json data-zonaprop.json data-lavoz.json data-cordobaprop.json geocode-cache.json cordobaprop-coords-cache.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "Sin cambios — no commit."
           else
