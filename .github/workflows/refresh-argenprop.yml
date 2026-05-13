@@ -28,7 +28,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Sin cambios — no commit."
           else
-            git pull --rebase origin main
             git commit -m "chore(data): refresh argenprop [skip ci]"
+            git pull --rebase origin main
             git push
           fi
