@@ -35,7 +35,7 @@
     .stat .lbl{font-size:10px;opacity:.8}
 
     /* TOPBAR */
-    #topbar{background:#fff;padding:6px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ddd;flex-shrink:0}
+    #topbar{background:#fff;padding:6px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ddd;flex-shrink:0;flex-wrap:wrap;row-gap:5px}
     #filter-toggle{background:#2d6a9f;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap}
     #filter-toggle:hover{background:#1a3c5e}
     .badge{background:#2d6a9f;color:#fff;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;margin-left:auto;white-space:nowrap}
@@ -48,10 +48,15 @@
     #only-new-btn.active{background:#f59e0b;color:#fff;box-shadow:0 0 0 2px rgba(245,158,11,.25)}
     #only-new-btn.active:hover{background:#d97706}
     .source-buttons{display:flex;gap:6px;flex-wrap:wrap}
-    .src-btn{background:#fff;border:1.5px solid;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;opacity:.7}
+    .src-btn{background:#fff;border:1.5px solid;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;opacity:.7;display:inline-flex;align-items:center;gap:5px}
     .src-btn .src-count{font-size:10px;font-weight:600;opacity:.7;margin-left:4px}
     .src-btn.active{opacity:1;color:#fff !important}
     .src-btn:hover{opacity:1}
+    .src-shape{display:inline-block;width:10px;height:10px;background:currentColor;border-radius:50%;flex-shrink:0}
+    .src-shape.sq{border-radius:2px}
+    .src-shape.dm{border-radius:0;transform:rotate(45deg)}
+    .src-shape.tr{border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)}
+    .src-shape.pt{border-radius:0;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)}
 
     /* FILTER PANEL */
     #filter-panel{position:absolute;top:0;left:0;width:310px;height:100%;background:#fff;z-index:1000;box-shadow:4px 0 16px rgba(0,0,0,.15);display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s ease}
@@ -163,7 +168,19 @@
     .legend-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
 
     @media(max-width:600px){
+      #header{padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top))}
       #header h1{font-size:13px}
+      #header .sub{font-size:10px}
+      .stat .num{font-size:16px}
+      .stat .lbl{font-size:9px}
+
+      #topbar{padding:5px 8px;gap:6px}
+      #filter-toggle,#apply-btn,#only-new-btn{padding:5px 10px;font-size:11px}
+      #reset-btn{padding:5px 8px;font-size:11px}
+      .src-btn{padding:4px 8px;font-size:11px}
+      .src-btn .src-count{font-size:9px}
+      .badge{display:none}
+
       #login-box{width:88vw;padding:28px 20px}
       #filter-panel{width:85vw}
     }
@@ -466,11 +483,11 @@ var showOnlyNew = false;
 // 1) que el scraper marque sus items con `fuente: '<id>'`
 // 2) sumar una entrada acá con id, label y color
 var SOURCES = [
-  { id: 'bna',         label: '\u{1F3DB}️ BNA',         color: '#1a3c5e' },
-  { id: 'argenprop',   label: '\u{1F3E1} Argenprop',   color: '#10b981' },
-  { id: 'zonaprop',    label: '\u{1F511} Zonaprop',    color: '#9333ea' },
-  { id: 'lavoz',       label: '\u{1F4F0} La Voz',      color: '#0891b2' },
-  { id: 'cordobaprop', label: '\u{1F3D9}️ CordobaProp', color: '#db2777' }
+  { id: 'bna',         label: 'BNA',         color: '#1a3c5e', shape: '' },
+  { id: 'argenprop',   label: 'Argenprop',   color: '#10b981', shape: 'sq' },
+  { id: 'zonaprop',    label: 'Zonaprop',    color: '#9333ea', shape: 'dm' },
+  { id: 'lavoz',       label: 'La Voz',      color: '#0891b2', shape: 'tr' },
+  { id: 'cordobaprop', label: 'CordobaProp', color: '#db2777', shape: 'pt' }
 ];
 var activeSources = new Set(SOURCES.map(function(s){return s.id;}));
 var PRICE_BUCKETS = [
@@ -740,15 +757,7 @@ function initMap(){
       return '<div class="legend-item price-bucket'+off+'" data-bucket="'+b.id+'" title="Click para filtrar">'+
              '<div class="legend-dot" style="background:'+b.color+'"></div>'+b.label+'</div>';
     }).join('');
-    d.innerHTML =
-      '<b>Precio (USD)</b>'+ bucketsHtml +
-      '<div style="height:6px"></div>'+
-      '<b>Fuente</b>'+
-      '<div class="legend-item"><div class="legend-dot" style="background:#555"></div>BNA</div>'+
-      '<div class="legend-item"><div class="legend-dot legend-dot-sq" style="background:#555"></div>Argenprop</div>'+
-      '<div class="legend-item"><div class="legend-dot legend-dot-dm" style="background:#555"></div>Zonaprop</div>'+
-      '<div class="legend-item"><div class="legend-dot legend-dot-tr" style="background:#555"></div>La Voz</div>'+
-      '<div class="legend-item"><div class="legend-dot legend-dot-pt" style="background:#555"></div>CordobaProp</div>';
+    d.innerHTML = '<b>Precio (USD)</b>'+ bucketsHtml;
 
     L.DomEvent.disableClickPropagation(d);
     L.DomEvent.disableScrollPropagation(d);
@@ -944,7 +953,8 @@ function renderSourceButtons(){
     btn.dataset.src = s.id;
     var count = (window._countBySource || {})[s.id];
     var countHtml = count ? ' <span class="src-count">'+count.toLocaleString('es-AR')+'</span>' : '';
-    btn.innerHTML = s.label + countHtml;
+    var shapeHtml = '<span class="src-shape '+(s.shape||'')+'"></span>';
+    btn.innerHTML = shapeHtml + s.label + countHtml;
     btn.title = 'Mostrar/ocultar propiedades de ' + s.id.toUpperCase();
     btn.addEventListener('click', function(){ toggleSource(s.id); });
     paintSrcBtn(btn, s, activeSources.has(s.id));
