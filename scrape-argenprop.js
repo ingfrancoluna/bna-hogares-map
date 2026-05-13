@@ -196,11 +196,29 @@ function saveCache(cache) {
   console.log(`Cache geocoding: ${Object.keys(cache).length} entradas`);
 
   console.log('Lanzando Chromium headless...');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--disable-blink-features=AutomationControlled']
+  });
   const context = await browser.newContext({
     userAgent: UA_BROWSER,
     locale: 'es-AR',
-    viewport: { width: 1280, height: 800 }
+    viewport: { width: 1280, height: 800 },
+    extraHTTPHeaders: { 'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8' }
+  });
+  // Stealth: borrar las huellas mas obvias de webdriver que AWS WAF chequea
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    window.chrome = { runtime: {} };
+    const origQuery = window.navigator.permissions && window.navigator.permissions.query;
+    if (origQuery) {
+      window.navigator.permissions.query = (p) =>
+        p && p.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : origQuery(p);
+    }
   });
   const page = await context.newPage();
 
@@ -214,6 +232,7 @@ function saveCache(cache) {
   parseCards(firstHtml).forEach(c => byId.set(c.id, c));
   console.log(`  page 1/${totalPages}: cards=${byId.size} totalUnicos=${byId.size} htmlBytes=${firstHtml.length}`);
 
+  let blockedDumped = false;
   for (let p = 2; p <= totalPages; p++) {
     await sleep(PAGE_THROTTLE_MS);
     try {
@@ -224,6 +243,12 @@ function saveCache(cache) {
       const firstId = cards[0] ? cards[0].id : '-';
       const newOnes = byId.size - beforeSize;
       console.log(`  page ${p}/${totalPages}: cards=${cards.length} firstId=${firstId} new=${newOnes} totalUnicos=${byId.size} htmlBytes=${html.length}`);
+      if (!blockedDumped && cards.length === 0 && html.length < 50000) {
+        blockedDumped = true;
+        console.log(`\n========== DUMP HTML BLOQUEADO (page ${p}, ${html.length} bytes) ==========`);
+        console.log(html);
+        console.log(`========== FIN DUMP ==========\n`);
+      }
     } catch (e) {
       console.error(`  page ${p} ERROR:`, e.message);
     }
