@@ -199,6 +199,7 @@ function saveCache(cache) {
   const byId = new Map();
   parseCards(firstHtml).forEach(c => byId.set(c.id, c));
 
+  let blockedDumped = false;
   for (let p = 2; p <= totalPages; p++) {
     await sleep(PAGE_THROTTLE_MS);
     try {
@@ -209,6 +210,12 @@ function saveCache(cache) {
       const firstId = cards[0] ? cards[0].id : '-';
       const newOnes = byId.size - beforeSize;
       console.log(`  page ${p}/${totalPages}: cards=${cards.length} firstId=${firstId} new=${newOnes} totalUnicos=${byId.size} htmlBytes=${html.length}`);
+      if (!blockedDumped && cards.length === 0 && html.length < 10000) {
+        blockedDumped = true;
+        console.log(`\n========== DUMP HTML BLOQUEADO (page ${p}, ${html.length} bytes) ==========`);
+        console.log(html);
+        console.log(`========== FIN DUMP ==========\n`);
+      }
     } catch (e) {
       console.error(`  page ${p} ERROR:`, e.message);
     }
