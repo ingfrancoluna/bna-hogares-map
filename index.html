@@ -115,10 +115,12 @@
     .marker-dot.square{border-radius:2px}
     .marker-dot.diamond{border-radius:0;transform:rotate(45deg)}
     .marker-dot.triangle{border-radius:0;border:none;clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+    .marker-dot.pentagon{border-radius:0;border:none;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
     .marker-dot.new{box-shadow:0 0 0 3px rgba(245,158,11,.85),0 1px 4px rgba(0,0,0,.4)}
     .legend-dot-sq{border-radius:2px !important}
     .legend-dot-dm{border-radius:0 !important;transform:rotate(45deg)}
     .legend-dot-tr{border-radius:0 !important;clip-path:polygon(50% 0,100% 100%,0 100%)}
+    .legend-dot-pt{border-radius:0 !important;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)}
 
     /* POPUP IMAGE BADGE */
     .popup-img-wrap{position:relative}
@@ -127,6 +129,7 @@
     .popup-source-badge.argenprop{background:#15803d}
     .popup-source-badge.zonaprop{background:#7e22ce}
     .popup-source-badge.lavoz{background:#0e7490}
+    .popup-source-badge.cordobaprop{background:#be185d}
     .popup-new-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
     .fp-row-inline{display:flex;gap:6px;align-items:center;font-size:11px;color:#555;margin-bottom:6px;flex-wrap:wrap}
     .fp-row-inline label{flex:1;min-width:0}
@@ -384,7 +387,8 @@ function loadData(){
     { id: 'bna',       url: './data-bna.json' },
     { id: 'argenprop', url: './data-argenprop.json' },
     { id: 'zonaprop',  url: './data-zonaprop.json' },
-    { id: 'lavoz',     url: './data-lavoz.json' }
+    { id: 'lavoz',     url: './data-lavoz.json' },
+    { id: 'cordobaprop', url: './data-cordobaprop.json' }
   ];
 
   Promise.all(sources.map(function(s){
@@ -462,10 +466,11 @@ var showOnlyNew = false;
 // 1) que el scraper marque sus items con `fuente: '<id>'`
 // 2) sumar una entrada acá con id, label y color
 var SOURCES = [
-  { id: 'bna',       label: '\u{1F3DB}️ BNA',       color: '#1a3c5e' },
-  { id: 'argenprop', label: '\u{1F3E1} Argenprop', color: '#10b981' },
-  { id: 'zonaprop',  label: '\u{1F511} Zonaprop',  color: '#9333ea' },
-  { id: 'lavoz',     label: '\u{1F4F0} La Voz',    color: '#0891b2' }
+  { id: 'bna',         label: '\u{1F3DB}️ BNA',         color: '#1a3c5e' },
+  { id: 'argenprop',   label: '\u{1F3E1} Argenprop',   color: '#10b981' },
+  { id: 'zonaprop',    label: '\u{1F511} Zonaprop',    color: '#9333ea' },
+  { id: 'lavoz',       label: '\u{1F4F0} La Voz',      color: '#0891b2' },
+  { id: 'cordobaprop', label: '\u{1F3D9}️ CordobaProp', color: '#db2777' }
 ];
 var activeSources = new Set(SOURCES.map(function(s){return s.id;}));
 var PRICE_BUCKETS = [
@@ -536,6 +541,7 @@ function initMap(){
     var shapeCls = shape === 'square' ? ' square'
                  : shape === 'diamond' ? ' diamond'
                  : shape === 'triangle' ? ' triangle'
+                 : shape === 'pentagon' ? ' pentagon'
                  : '';
     return L.divIcon({
       className:'',
@@ -568,6 +574,7 @@ function initMap(){
     var fuenteLabel = fuenteId === 'argenprop' ? 'Argenprop'
                     : fuenteId === 'zonaprop'  ? 'Zonaprop'
                     : fuenteId === 'lavoz'     ? 'La Voz'
+                    : fuenteId === 'cordobaprop' ? 'CordobaProp'
                     : 'BNA';
     var imgH = p.imagen
       ? '<div class="popup-img-wrap"><img class="popup-img" src="'+p.imagen+'" loading="lazy" onerror="this.style.display=\'none\'"><span class="popup-source-badge '+fuenteId+'">'+fuenteLabel+'</span></div>'
@@ -585,7 +592,8 @@ function initMap(){
     var fallbacks = {
       argenprop: 'https://www.argenprop.com/casas/venta/cordoba',
       zonaprop:  'https://www.zonaprop.com.ar/casas-venta-cordoba.html',
-      lavoz:     'https://clasificados.lavoz.com.ar/inmuebles/casa?map=true&operacion=venta&provincia=cordoba'
+      lavoz:     'https://clasificados.lavoz.com.ar/inmuebles/casa?map=true&operacion=venta&provincia=cordoba',
+      cordobaprop: 'https://cordobaprop.com/propiedades/?operaciones=1&tipos=1&localidades=1&order=relevancia&order_type=DESC&offset=0&viewtype=map'
     };
     var detailUrl = p.url || fallbacks[p.fuente] || 'https://mashogaresconbna.com.ar/propiedad/'+p.id;
     return imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="'+detailUrl+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
@@ -609,6 +617,7 @@ function initMap(){
     var shape = p.fuente === 'argenprop' ? 'square'
               : p.fuente === 'zonaprop'  ? 'diamond'
               : p.fuente === 'lavoz'     ? 'triangle'
+              : p.fuente === 'cordobaprop' ? 'pentagon'
               : 'circle';
     var ll = L.latLng(p.lat, p.lng);
     var m = L.marker(ll, {icon: mkIcon(color, nuevo, shape)});
@@ -738,7 +747,8 @@ function initMap(){
       '<div class="legend-item"><div class="legend-dot" style="background:#555"></div>BNA</div>'+
       '<div class="legend-item"><div class="legend-dot legend-dot-sq" style="background:#555"></div>Argenprop</div>'+
       '<div class="legend-item"><div class="legend-dot legend-dot-dm" style="background:#555"></div>Zonaprop</div>'+
-      '<div class="legend-item"><div class="legend-dot legend-dot-tr" style="background:#555"></div>La Voz</div>';
+      '<div class="legend-item"><div class="legend-dot legend-dot-tr" style="background:#555"></div>La Voz</div>'+
+      '<div class="legend-item"><div class="legend-dot legend-dot-pt" style="background:#555"></div>CordobaProp</div>';
 
     L.DomEvent.disableClickPropagation(d);
     L.DomEvent.disableScrollPropagation(d);
