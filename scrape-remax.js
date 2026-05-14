@@ -102,8 +102,10 @@ function buildImage(listing) {
 }
 
 function buildUrlListing(listing) {
-  const slug = listing.slug || `${listing.type.value || 'propiedad'}-${listing.id}`;
-  return `${BASE}/listings/${slug}-${listing.id}`;
+  // URL canónica del detalle: /listings/{slug} (sin id). Si por algún motivo no
+  // viene slug, caemos a la búsqueda por id como mejor esfuerzo.
+  if (listing.slug) return `${BASE}/listings/${listing.slug}`;
+  return `${BASE}/listings/buy?q=${listing.id}`;
 }
 
 function normalize(listing) {
