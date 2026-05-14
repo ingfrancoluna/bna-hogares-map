@@ -121,11 +121,13 @@
     .marker-dot.diamond{border-radius:0;transform:rotate(45deg)}
     .marker-dot.triangle{border-radius:0;border:none;clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
     .marker-dot.pentagon{border-radius:0;border:none;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+    .marker-dot.hexagon{border-radius:0;border:none;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
     .marker-dot.new{box-shadow:0 0 0 3px rgba(245,158,11,.85),0 1px 4px rgba(0,0,0,.4)}
     .legend-dot-sq{border-radius:2px !important}
     .legend-dot-dm{border-radius:0 !important;transform:rotate(45deg)}
     .legend-dot-tr{border-radius:0 !important;clip-path:polygon(50% 0,100% 100%,0 100%)}
     .legend-dot-pt{border-radius:0 !important;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)}
+    .legend-dot-hx{border-radius:0 !important;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}
 
     /* POPUP IMAGE BADGE */
     .popup-img-wrap{position:relative}
@@ -135,6 +137,7 @@
     .popup-source-badge.zonaprop{background:#7e22ce}
     .popup-source-badge.lavoz{background:#0e7490}
     .popup-source-badge.cordobaprop{background:#be185d}
+    .popup-source-badge.remax{background:#b91c1c}
     .popup-new-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
     .fp-row-inline{display:flex;gap:6px;align-items:center;font-size:11px;color:#555;margin-bottom:6px;flex-wrap:wrap}
     .fp-row-inline label{flex:1;min-width:0}
@@ -405,7 +408,8 @@ function loadData(){
     { id: 'argenprop', url: './data-argenprop.json' },
     { id: 'zonaprop',  url: './data-zonaprop.json' },
     { id: 'lavoz',     url: './data-lavoz.json' },
-    { id: 'cordobaprop', url: './data-cordobaprop.json' }
+    { id: 'cordobaprop', url: './data-cordobaprop.json' },
+    { id: 'remax',     url: './data-remax.json' }
   ];
 
   Promise.all(sources.map(function(s){
@@ -487,7 +491,8 @@ var SOURCES = [
   { id: 'argenprop',   label: 'Argenprop',   color: '#10b981', shape: 'sq' },
   { id: 'zonaprop',    label: 'Zonaprop',    color: '#9333ea', shape: 'dm' },
   { id: 'lavoz',       label: 'La Voz',      color: '#0891b2', shape: 'tr' },
-  { id: 'cordobaprop', label: 'CordobaProp', color: '#db2777', shape: 'pt' }
+  { id: 'cordobaprop', label: 'CordobaProp', color: '#db2777', shape: 'pt' },
+  { id: 'remax',       label: 'Remax',       color: '#dc2626', shape: 'hx' }
 ];
 var activeSources = new Set(SOURCES.map(function(s){return s.id;}));
 var PRICE_BUCKETS = [
@@ -592,6 +597,7 @@ function initMap(){
                     : fuenteId === 'zonaprop'  ? 'Zonaprop'
                     : fuenteId === 'lavoz'     ? 'La Voz'
                     : fuenteId === 'cordobaprop' ? 'CordobaProp'
+                    : fuenteId === 'remax'     ? 'Remax'
                     : 'BNA';
     var imgH = p.imagen
       ? '<div class="popup-img-wrap"><img class="popup-img" src="'+p.imagen+'" loading="lazy" onerror="this.style.display=\'none\'"><span class="popup-source-badge '+fuenteId+'">'+fuenteLabel+'</span></div>'
@@ -610,7 +616,8 @@ function initMap(){
       argenprop: 'https://www.argenprop.com/casas/venta/cordoba',
       zonaprop:  'https://www.zonaprop.com.ar/casas-venta-cordoba.html',
       lavoz:     'https://clasificados.lavoz.com.ar/inmuebles/casa?map=true&operacion=venta&provincia=cordoba',
-      cordobaprop: 'https://cordobaprop.com/propiedades/?operaciones=1&tipos=1&localidades=1&order=relevancia&order_type=DESC&offset=0&viewtype=map'
+      cordobaprop: 'https://cordobaprop.com/propiedades/?operaciones=1&tipos=1&localidades=1&order=relevancia&order_type=DESC&offset=0&viewtype=map',
+      remax:     'https://www.remax.com.ar/listings/buy?in:operationId=1&in:typeId=9&locations=in:CB@C%C3%B3rdoba::::::'
     };
     var detailUrl = p.url || fallbacks[p.fuente] || 'https://mashogaresconbna.com.ar/propiedad/'+p.id;
     return imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="'+detailUrl+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
@@ -635,6 +642,7 @@ function initMap(){
               : p.fuente === 'zonaprop'  ? 'diamond'
               : p.fuente === 'lavoz'     ? 'triangle'
               : p.fuente === 'cordobaprop' ? 'pentagon'
+              : p.fuente === 'remax'     ? 'hexagon'
               : 'circle';
     var ll = L.latLng(p.lat, p.lng);
     var m = L.marker(ll, {icon: mkIcon(color, nuevo, shape)});
