@@ -1,34 +1,35 @@
 const fs = require('fs');
+const { chromium } = require('playwright');
 
 const BASE = 'https://www.zonaprop.com.ar';
 const PROVINCIA = 'Córdoba';
 const FUENTE = 'zonaprop';
 const OUT_FILE = 'data-zonaprop.json';
 
-const UA = 'Mozilla/5.0 Chrome/127';
-const PAGE_THROTTLE_MS = 600;
-const MAX_PAGES = parseInt(process.env.MAX_PAGES || '0', 10);
+// Zonaprop pone Cloudflare Turnstile delante de cualquier nav. La p1 trae el state inline
+// en <script>window.__PRELOADED_STATE__ = {...}</script> y se puede extraer del HTML raw,
+// pero p2+ dispara un challenge JS que Playwright headless básico no resuelve. Por eso
+// solo scrapeamos la p1 (los ~30 listings más recientes) y mergeamos con el archivo
+// previo: cada refresh suma los nuevos y refresca los existentes; el histórico se
+// preserva entre runs.
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+const NAV_TIMEOUT_MS = 60000;
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-function pageUrl(n) {
-  return n === 1
-    ? `${BASE}/casas-venta-cordoba.html?vista=mapa`
-    : `${BASE}/casas-venta-cordoba-pagina-${n}.html?vista=mapa`;
-}
-
-async function fetchHtml(url) {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA }
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} en ${url}`);
-  return res.text();
+function pageUrl() {
+  return `${BASE}/casas-venta-cordoba.html?vista=mapa`;
 }
 
 function extractState(html) {
+  // El bundle de Next.js consume window.__PRELOADED_STATE__ y lo limpia tras hidratar,
+  // por eso NO sirve leerlo via page.evaluate. Lo extraemos del HTML raw inline.
   const m = html.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\})\s*;\s*window\./);
   if (!m) return null;
   try { return JSON.parse(m[1]); } catch { return null; }
+}
+
+async function fetchHtmlBrowser(page, url) {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+  return await page.content();
 }
 
 function num(v) {
@@ -47,9 +48,7 @@ function mapPost(post) {
   const moneda = priceObj ? priceObj.currency : 'USD';
 
   const loc = post.postingLocation?.location;
-  // location es la zona/barrio; parent suele ser la ciudad
   const localidad = (loc && loc.parent && loc.parent.name) || (loc && loc.name) || '';
-
   const direccion = (post.postingLocation?.address?.name) || '';
 
   const mf = post.mainFeatures || {};
@@ -91,47 +90,81 @@ function mapPost(post) {
   };
 }
 
+function loadPrevious() {
+  if (!fs.existsSync(OUT_FILE)) return [];
+  try {
+    const arr = JSON.parse(fs.readFileSync(OUT_FILE, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    console.error(`No pude leer ${OUT_FILE}: ${e.message}`);
+    return [];
+  }
+}
+
 (async () => {
+  const previous = loadPrevious();
+  console.log(`Previo en disco: ${previous.length} items`);
+
+  console.log('Lanzando Chromium headless...');
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--disable-blink-features=AutomationControlled']
+  });
+  const context = await browser.newContext({
+    userAgent: UA,
+    locale: 'es-AR',
+    viewport: { width: 1280, height: 800 },
+    extraHTTPHeaders: { 'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8' }
+  });
+  // Stealth: borrar huellas de webdriver que Cloudflare chequea.
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    window.chrome = { runtime: {} };
+    const origQuery = window.navigator.permissions && window.navigator.permissions.query;
+    if (origQuery) {
+      window.navigator.permissions.query = (p) =>
+        p && p.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : origQuery(p);
+    }
+  });
+  const page = await context.newPage();
+
   console.log('Bajando página 1...');
-  const firstHtml = await fetchHtml(pageUrl(1));
-  const firstState = extractState(firstHtml);
-  if (!firstState) throw new Error('No pude extraer PRELOADED_STATE de la página 1');
+  const html = await fetchHtmlBrowser(page, pageUrl());
+  const state = extractState(html);
+  await browser.close();
 
-  let totalPages = firstState.listStore?.paging?.totalPages || 1;
-  const totalPosts = firstState.listStore?.paging?.total || 0;
-  if (MAX_PAGES > 0) totalPages = Math.min(totalPages, MAX_PAGES);
-  console.log(`Total: ${totalPosts} casas, ${firstState.listStore?.paging?.totalPages} páginas. Voy por ${totalPages}.`);
+  if (!state) throw new Error('No pude extraer PRELOADED_STATE de la página 1');
 
-  const byId = new Map();
+  const totalPosts = state.listStore?.paging?.total || 0;
+  const totalPages = state.listStore?.paging?.totalPages || 1;
+  console.log(`Total reportado por Zonaprop: ${totalPosts} casas en ${totalPages} páginas (solo bajamos p1).`);
+
+  const fresh = [];
   let geoOk = 0, geoSkip = 0;
-
-  function processPosts(posts) {
-    for (const post of (posts || [])) {
-      const mapped = mapPost(post);
-      if (mapped) { byId.set(String(mapped.id), mapped); geoOk++; }
-      else geoSkip++;
-    }
+  for (const post of (state.listStore.listPostings || [])) {
+    const mapped = mapPost(post);
+    if (mapped) { fresh.push(mapped); geoOk++; }
+    else geoSkip++;
   }
+  console.log(`p1: ${geoOk} con coords, ${geoSkip} descartados`);
 
-  processPosts(firstState.listStore.listPostings);
-
-  for (let p = 2; p <= totalPages; p++) {
-    await sleep(PAGE_THROTTLE_MS);
-    try {
-      const html = await fetchHtml(pageUrl(p));
-      const state = extractState(html);
-      if (!state) { console.error(`  page ${p}: sin state`); continue; }
-      processPosts(state.listStore.listPostings);
-      if (p % 20 === 0 || p === totalPages) {
-        console.log(`  page ${p}/${totalPages} → únicos ${byId.size} (ok=${geoOk}, skip=${geoSkip})`);
-      }
-    } catch (e) {
-      console.error(`  page ${p} ERROR:`, e.message);
-    }
+  // Merge acumulativo: los frescos pisan a los previos con mismo id (precio/datos pueden
+  // haber cambiado), los previos que no aparecen quedan tal cual.
+  const byId = new Map();
+  for (const it of previous) byId.set(String(it.id), it);
+  let updated = 0, added = 0;
+  for (const it of fresh) {
+    const k = String(it.id);
+    if (byId.has(k)) updated++; else added++;
+    byId.set(k, it);
   }
-
   const items = [...byId.values()];
-  // más recientes primero
+
+  // Orden: más recientes primero.
   items.sort((a, b) => {
     const ta = a.fechaCreacion ? Date.parse(a.fechaCreacion) : 0;
     const tb = b.fechaCreacion ? Date.parse(b.fechaCreacion) : 0;
@@ -140,9 +173,9 @@ function mapPost(post) {
 
   fs.writeFileSync(OUT_FILE, JSON.stringify(items));
   console.log(`\nFinal:`);
-  console.log(`  Posts con coords: ${geoOk}`);
-  console.log(`  Posts sin coords (descartados): ${geoSkip}`);
-  console.log(`  Únicos por id: ${items.length}`);
+  console.log(`  Nuevos en p1: ${added}`);
+  console.log(`  Refrescados: ${updated}`);
+  console.log(`  Total acumulado: ${items.length}`);
   console.log(`  ${OUT_FILE}: ${(fs.statSync(OUT_FILE).size / 1024).toFixed(1)} KB`);
 
   if (items.length === 0) {
