@@ -167,7 +167,12 @@
 
     /* LEGEND */
     .legend{background:#fff;padding:8px 12px;border-radius:7px;box-shadow:0 2px 6px rgba(0,0,0,.2);font-size:11px}
-    .legend b{display:block;margin-bottom:5px}
+    .legend-header{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;user-select:none;margin-bottom:5px}
+    .legend-header b{display:block}
+    .legend-toggle{font-size:10px;color:#6b7280;transition:transform .15s;line-height:1}
+    .legend.collapsed .legend-toggle{transform:rotate(-90deg)}
+    .legend.collapsed .legend-header{margin-bottom:0}
+    .legend.collapsed .legend-items{display:none}
     .legend-item{display:flex;align-items:center;gap:5px;margin-bottom:3px}
     .legend-item.price-bucket{cursor:pointer;user-select:none;padding:1px 4px;border-radius:4px;margin-left:-4px;transition:background .12s}
     .legend-item.price-bucket:hover{background:#f1f5f9}
@@ -764,16 +769,33 @@ function initMap(){
   var legend=L.control({position:'bottomright'});
   legend.onAdd=function(){
     var d = L.DomUtil.create('div','legend');
+    // Default colapsado en viewports angostos (mobile). Si el usuario tocó el toggle
+    // antes, respetamos su elección guardada.
+    var saved = null;
+    try { saved = localStorage.getItem('legendCollapsed'); } catch (e) {}
+    var collapsed = saved !== null ? saved === '1' : window.innerWidth < 600;
+    if (collapsed) d.classList.add('collapsed');
+
     var bucketsHtml = PRICE_BUCKETS.map(function(b){
       var off = activePriceBuckets.has(b.id) ? '' : ' off';
       return '<div class="legend-item price-bucket'+off+'" data-bucket="'+b.id+'" title="Click para filtrar">'+
              '<div class="legend-dot" style="background:'+b.color+'"></div>'+b.label+'</div>';
     }).join('');
-    d.innerHTML = '<b>Precio (USD)</b>'+ bucketsHtml;
+    d.innerHTML =
+      '<div class="legend-header" title="Mostrar/ocultar">'+
+        '<b>Precio (USD)</b>'+
+        '<span class="legend-toggle">&#9660;</span>'+
+      '</div>'+
+      '<div class="legend-items">'+ bucketsHtml +'</div>';
 
     L.DomEvent.disableClickPropagation(d);
     L.DomEvent.disableScrollPropagation(d);
     d.addEventListener('click', function(ev){
+      if (ev.target.closest('.legend-header')) {
+        d.classList.toggle('collapsed');
+        try { localStorage.setItem('legendCollapsed', d.classList.contains('collapsed') ? '1' : '0'); } catch (e) {}
+        return;
+      }
       var item = ev.target.closest('.price-bucket');
       if (!item) return;
       var b = item.dataset.bucket;
