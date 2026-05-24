@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
     body{font-family:Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f2f5}
 
     /* LOGIN */
@@ -24,7 +25,10 @@
     #login-error{color:#ef4444;font-size:12px;margin-top:10px;display:none;font-weight:600}
 
     /* APP */
-    #app{display:none;flex-direction:column;height:100vh;height:100dvh}
+    /* position:fixed + inset:0 ata el #app al viewport real visible.
+       Más confiable que 100vh/100dvh en Chrome iOS, que a veces deja
+       una franja blanca entre el contenido y la toolbar inferior. */
+    #app{display:none;flex-direction:column;position:fixed;inset:0}
 
     /* HEADER */
     #header{background:linear-gradient(135deg,#1a3c5e,#2d6a9f);color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding-top:max(10px,env(safe-area-inset-top))}
