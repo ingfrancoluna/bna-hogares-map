@@ -179,6 +179,18 @@
     .legend-item.price-bucket.off{opacity:.4;text-decoration:line-through}
     .legend-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
 
+    /* GEOLOCATION */
+    .geo-btn{background:#fff;border:0;width:38px;height:38px;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;color:#374151;transition:background .15s,color .15s}
+    .geo-btn:hover{background:#f3f4f6}
+    .geo-btn.active{background:#2d6a9f;color:#fff}
+    .geo-btn.loading{opacity:.6;cursor:wait}
+    .geo-marker{width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25),0 0 14px rgba(37,99,235,.7);animation:geo-pulse 2s ease-out infinite}
+    @keyframes geo-pulse{
+      0%{box-shadow:0 0 0 1px rgba(0,0,0,.25),0 0 0 0 rgba(37,99,235,.55)}
+      70%{box-shadow:0 0 0 1px rgba(0,0,0,.25),0 0 0 16px rgba(37,99,235,0)}
+      100%{box-shadow:0 0 0 1px rgba(0,0,0,.25),0 0 0 0 rgba(37,99,235,0)}
+    }
+
     @media(max-width:600px){
       #header{padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top))}
       #header h1{font-size:13px}
@@ -807,6 +819,94 @@ function initMap(){
     return d;
   };
   legend.addTo(map);
+
+  // ── Geolocation: botón flotante para centrar el mapa en mi ubicación ──
+  var geoState = { watchId: null, marker: null, accuracyCircle: null, hasCentered: false };
+  var geoCtl = L.control({ position: 'bottomleft' });
+  geoCtl.onAdd = function(){
+    var d = L.DomUtil.create('div', '');
+    d.innerHTML = '<button class="geo-btn" id="geo-btn" title="Mi ubicación" aria-label="Mi ubicación">'+
+      '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:3px solid currentColor"></span>'+
+      '</button>';
+    L.DomEvent.disableClickPropagation(d);
+    L.DomEvent.disableScrollPropagation(d);
+    d.addEventListener('click', toggleGeo);
+    return d;
+  };
+  geoCtl.addTo(map);
+
+  function setBtnState(state){
+    var btn = document.getElementById('geo-btn');
+    if (!btn) return;
+    btn.classList.toggle('loading', state === 'loading');
+    btn.classList.toggle('active', state === 'active');
+  }
+
+  function stopGeo(){
+    if (geoState.watchId !== null) {
+      navigator.geolocation.clearWatch(geoState.watchId);
+      geoState.watchId = null;
+    }
+    if (geoState.marker) { map.removeLayer(geoState.marker); geoState.marker = null; }
+    if (geoState.accuracyCircle) { map.removeLayer(geoState.accuracyCircle); geoState.accuracyCircle = null; }
+    geoState.hasCentered = false;
+    setBtnState('off');
+  }
+
+  function toggleGeo(){
+    if (geoState.watchId !== null) { stopGeo(); return; }
+    if (!('geolocation' in navigator)) {
+      alert('Tu navegador no soporta geolocalización.');
+      return;
+    }
+    setBtnState('loading');
+    geoState.watchId = navigator.geolocation.watchPosition(
+      function(pos){
+        var lat = pos.coords.latitude, lng = pos.coords.longitude;
+        var acc = pos.coords.accuracy || 0; // metros
+        var ll = L.latLng(lat, lng);
+        if (!geoState.marker) {
+          geoState.marker = L.marker(ll, {
+            icon: L.divIcon({
+              className: '',
+              html: '<div class="geo-marker"></div>',
+              iconSize: [18, 18],
+              iconAnchor: [9, 9]
+            }),
+            interactive: false,
+            keyboard: false
+          }).addTo(map);
+        } else {
+          geoState.marker.setLatLng(ll);
+        }
+        if (acc > 0) {
+          if (!geoState.accuracyCircle) {
+            geoState.accuracyCircle = L.circle(ll, {
+              radius: acc, color: '#2563eb', weight: 1, fillOpacity: 0.08, interactive: false
+            }).addTo(map);
+          } else {
+            geoState.accuracyCircle.setLatLng(ll);
+            geoState.accuracyCircle.setRadius(acc);
+          }
+        }
+        if (!geoState.hasCentered) {
+          // En el primer fix centramos y hacemos zoom razonable; después solo seguimos sin alterar el zoom del usuario.
+          map.setView(ll, Math.max(map.getZoom(), 15));
+          geoState.hasCentered = true;
+        }
+        setBtnState('active');
+      },
+      function(err){
+        stopGeo();
+        var msg = err && err.code === 1 ? 'Permiso denegado. Habilitá la ubicación en los ajustes del navegador.'
+                : err && err.code === 2 ? 'No pude obtener la ubicación (señal débil o GPS apagado).'
+                : err && err.code === 3 ? 'Timeout esperando la ubicación.'
+                : 'No pude obtener la ubicación.';
+        alert(msg);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+  }
 }
 
 // ── Filters ──────────────────────────────────────────────────────────────
