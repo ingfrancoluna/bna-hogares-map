@@ -199,7 +199,7 @@ function subdivide(bbox) {
     headless: true,
     args: ['--disable-blink-features=AutomationControlled']
   });
-  const context = await browser.newContext({
+  const contextOpts = {
     userAgent: UA,
     locale: 'es-AR',
     viewport: { width: 1366, height: 768 },
@@ -210,7 +210,15 @@ function subdivide(bbox) {
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"Windows"'
     }
-  });
+  };
+  // Soporte para proxy externo (Tor, ScrapingBee, etc) via env MELI_PROXY=socks5://host:port
+  // o http://user:pass@host:port. En CI lo seteamos a 127.0.0.1:9050 (Tor local) para
+  // sortear el bloqueo por IP de cloud que aplica ML.
+  if (process.env.MELI_PROXY) {
+    contextOpts.proxy = { server: process.env.MELI_PROXY };
+    console.log(`Usando proxy: ${process.env.MELI_PROXY.replace(/:[^@]+@/, ':****@')}`);
+  }
+  const context = await browser.newContext(contextOpts);
   // Stealth completo: borrar las huellas más comunes que detectan headless/automation.
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });

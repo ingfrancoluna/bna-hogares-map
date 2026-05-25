@@ -9,7 +9,7 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +23,27 @@ jobs:
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
 
+      # ML bloquea las IPs de GH Actions con redirect a /account-verification.
+      # Tor sortea el bloqueo cambiando la IP saliente a un exit node random.
+      - name: Install and start Tor
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tor
+          sudo service tor start
+          # Tor tarda 10-30s en establecer un circuito. Probamos hasta 60s.
+          for i in $(seq 1 30); do
+            sleep 2
+            if curl --socks5-hostname 127.0.0.1:9050 -s --max-time 5 https://api.ipify.org > /tmp/ip 2>/dev/null && [ -s /tmp/ip ]; then
+              echo "Tor listo. IP saliente: $(cat /tmp/ip)"
+              exit 0
+            fi
+          done
+          echo "Tor no se levantó en 60s"
+          exit 1
+
       - name: Run MercadoLibre scraper
+        env:
+          MELI_PROXY: socks5://127.0.0.1:9050
         run: node scrape-meli.js
 
       - name: Commit data files if changed
