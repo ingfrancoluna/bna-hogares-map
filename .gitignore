@@ -1,2 +1,9 @@
 .claude/
 node_modules/
+# debug / probe files
+_*.html
+_*.json
+_*.js
+package-lock.json
+# screenshots locales
+image*.png

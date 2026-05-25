@@ -61,6 +61,8 @@
     .src-shape.dm{border-radius:0;transform:rotate(45deg)}
     .src-shape.tr{border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)}
     .src-shape.pt{border-radius:0;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)}
+    .src-shape.hx{border-radius:0;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}
+    .src-shape.st{border-radius:0;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
 
     /* FILTER PANEL */
     #filter-panel{position:absolute;top:0;left:0;width:310px;height:100%;background:#fff;z-index:1000;box-shadow:4px 0 16px rgba(0,0,0,.15);display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s ease}
@@ -126,12 +128,14 @@
     .marker-dot.triangle{border-radius:0;border:none;clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
     .marker-dot.pentagon{border-radius:0;border:none;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
     .marker-dot.hexagon{border-radius:0;border:none;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+    .marker-dot.star{border-radius:0;border:none;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
     .marker-dot.new{box-shadow:0 0 0 3px rgba(245,158,11,.85),0 1px 4px rgba(0,0,0,.4)}
     .legend-dot-sq{border-radius:2px !important}
     .legend-dot-dm{border-radius:0 !important;transform:rotate(45deg)}
     .legend-dot-tr{border-radius:0 !important;clip-path:polygon(50% 0,100% 100%,0 100%)}
     .legend-dot-pt{border-radius:0 !important;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%)}
     .legend-dot-hx{border-radius:0 !important;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}
+    .legend-dot-st{border-radius:0 !important;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
 
     /* POPUP IMAGE BADGE */
     .popup-img-wrap{position:relative}
@@ -142,6 +146,7 @@
     .popup-source-badge.lavoz{background:#0e7490}
     .popup-source-badge.cordobaprop{background:#be185d}
     .popup-source-badge.remax{background:#b91c1c}
+    .popup-source-badge.meli{background:#a16207}
     .popup-new-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
     .fp-row-inline{display:flex;gap:6px;align-items:center;font-size:11px;color:#555;margin-bottom:6px;flex-wrap:wrap}
     .fp-row-inline label{flex:1;min-width:0}
@@ -430,7 +435,8 @@ function loadData(){
     { id: 'zonaprop',  url: './data-zonaprop.json' },
     { id: 'lavoz',     url: './data-lavoz.json' },
     { id: 'cordobaprop', url: './data-cordobaprop.json' },
-    { id: 'remax',     url: './data-remax.json' }
+    { id: 'remax',     url: './data-remax.json' },
+    { id: 'meli',      url: './data-meli.json' }
   ];
 
   Promise.all(sources.map(function(s){
@@ -513,7 +519,8 @@ var SOURCES = [
   { id: 'zonaprop',    label: 'Zonaprop',    color: '#9333ea', shape: 'dm' },
   { id: 'lavoz',       label: 'La Voz',      color: '#0891b2', shape: 'tr' },
   { id: 'cordobaprop', label: 'CordobaProp', color: '#db2777', shape: 'pt' },
-  { id: 'remax',       label: 'Remax',       color: '#dc2626', shape: 'hx' }
+  { id: 'remax',       label: 'Remax',       color: '#dc2626', shape: 'hx' },
+  { id: 'meli',        label: 'MercadoLibre',color: '#eab308', shape: 'st' }
 ];
 var activeSources = new Set(SOURCES.map(function(s){return s.id;}));
 var PRICE_BUCKETS = [
@@ -585,6 +592,8 @@ function initMap(){
                  : shape === 'diamond' ? ' diamond'
                  : shape === 'triangle' ? ' triangle'
                  : shape === 'pentagon' ? ' pentagon'
+                 : shape === 'hexagon' ? ' hexagon'
+                 : shape === 'star' ? ' star'
                  : '';
     return L.divIcon({
       className:'',
@@ -619,6 +628,7 @@ function initMap(){
                     : fuenteId === 'lavoz'     ? 'La Voz'
                     : fuenteId === 'cordobaprop' ? 'CordobaProp'
                     : fuenteId === 'remax'     ? 'Remax'
+                    : fuenteId === 'meli'      ? 'MercadoLibre'
                     : 'BNA';
     var imgH = p.imagen
       ? '<div class="popup-img-wrap"><img class="popup-img" src="'+p.imagen+'" loading="lazy" onerror="this.style.display=\'none\'"><span class="popup-source-badge '+fuenteId+'">'+fuenteLabel+'</span></div>'
@@ -638,7 +648,8 @@ function initMap(){
       zonaprop:  'https://www.zonaprop.com.ar/casas-venta-cordoba.html',
       lavoz:     'https://clasificados.lavoz.com.ar/inmuebles/casa?map=true&operacion=venta&provincia=cordoba',
       cordobaprop: 'https://cordobaprop.com/propiedades/?operaciones=1&tipos=1&localidades=1&order=relevancia&order_type=DESC&offset=0&viewtype=map',
-      remax:     'https://www.remax.com.ar/listings/buy?in:operationId=1&in:typeId=9&locations=in:CB@C%C3%B3rdoba::::::'
+      remax:     'https://www.remax.com.ar/listings/buy?in:operationId=1&in:typeId=9&locations=in:CB@C%C3%B3rdoba::::::',
+      meli:      'https://inmuebles.mercadolibre.com.ar/casas/venta/cordoba/'
     };
     var detailUrl = p.url || fallbacks[p.fuente] || 'https://mashogaresconbna.com.ar/propiedad/'+p.id;
     return imgH+'<div class="popup-header"><div class="popup-price">'+price+'</div><div class="popup-title">'+p.titulo+'</div></div>'+body+'<a href="'+detailUrl+'" target="_blank" class="popup-link">Ver propiedad completa &rarr;</a>';
@@ -664,6 +675,7 @@ function initMap(){
               : p.fuente === 'lavoz'     ? 'triangle'
               : p.fuente === 'cordobaprop' ? 'pentagon'
               : p.fuente === 'remax'     ? 'hexagon'
+              : p.fuente === 'meli'      ? 'star'
               : 'circle';
     var ll = L.latLng(p.lat, p.lng);
     var m = L.marker(ll, {icon: mkIcon(color, nuevo, shape)});
