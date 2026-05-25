@@ -63,6 +63,10 @@ async function fetchPageItems(page, bbox, offset) {
   try {
     await page.waitForSelector('.ui-search-layout__item', { timeout: LISTING_WAIT_MS });
   } catch {
+    // Diag: log la URL final + tamaño del HTML para entender por qué no apareció.
+    const finalUrl = page.url();
+    const sz = (await page.content()).length;
+    console.log(`    DIAG bbox=${bbox.name} offset=${offset} finalUrl=${finalUrl} htmlBytes=${sz}`);
     return { items: [] };
   }
   await sleep(400);

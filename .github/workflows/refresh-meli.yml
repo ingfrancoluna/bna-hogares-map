@@ -29,16 +29,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y tor
-          sudo service tor start
-          # Tor tarda 10-30s en establecer un circuito. Probamos hasta 60s.
-          for i in $(seq 1 30); do
+          # ML probablemente geofencea: con exit nodes europeos no muestra propiedades AR.
+          # Restringimos exits a países latinoamericanos (donde ML opera) y fallback US/CA.
+          sudo tee -a /etc/tor/torrc > /dev/null <<EOF
+          ExitNodes {ar},{br},{cl},{uy},{co},{mx},{pe},{us}
+          StrictNodes 1
+          EOF
+          sudo service tor restart
+          # Tor tarda 10-30s en establecer un circuito (más con ExitNodes restringido).
+          for i in $(seq 1 45); do
             sleep 2
             if curl --socks5-hostname 127.0.0.1:9050 -s --max-time 5 https://api.ipify.org > /tmp/ip 2>/dev/null && [ -s /tmp/ip ]; then
-              echo "Tor listo. IP saliente: $(cat /tmp/ip)"
+              IP=$(cat /tmp/ip)
+              echo "Tor listo. IP saliente: $IP"
+              COUNTRY=$(curl --socks5-hostname 127.0.0.1:9050 -s --max-time 5 "https://ipapi.co/$IP/country/" 2>/dev/null || echo "?")
+              echo "País: $COUNTRY"
               exit 0
             fi
           done
-          echo "Tor no se levantó en 60s"
+          echo "Tor no se levantó en 90s"
           exit 1
 
       - name: Run MercadoLibre scraper
