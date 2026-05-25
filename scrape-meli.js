@@ -202,16 +202,64 @@ function subdivide(bbox) {
   const context = await browser.newContext({
     userAgent: UA,
     locale: 'es-AR',
-    viewport: { width: 1280, height: 800 },
-    extraHTTPHeaders: { 'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8' }
+    viewport: { width: 1366, height: 768 },
+    extraHTTPHeaders: {
+      'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'sec-ch-ua': '"Chromium";v="131", "Not_A Brand";v="24"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"'
+    }
   });
+  // Stealth completo: borrar las huellas más comunes que detectan headless/automation.
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en'] });
+    Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en-US', 'en'] });
     Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-    window.chrome = { runtime: {} };
+    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+    Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+    Object.defineProperty(navigator, 'vendor', { get: () => 'Google Inc.' });
+    window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+    const origQuery = window.navigator.permissions && window.navigator.permissions.query;
+    if (origQuery) {
+      window.navigator.permissions.query = (p) =>
+        p && p.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : origQuery(p);
+    }
+    // WebGL vendor/renderer típico de hardware real
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(p) {
+      if (p === 37445) return 'Intel Inc.';
+      if (p === 37446) return 'Intel(R) UHD Graphics 620';
+      return getParameter.apply(this, arguments);
+    };
   });
   const page = await context.newPage();
+
+  // Warm-up: visitar el home de inmuebles primero para que ML setee sus cookies
+  // anti-bot. Sin esto, el primer GET al bbox dispara redirect a account-verification
+  // desde la IP del runner de GitHub Actions.
+  console.log('Warm-up: visitando home de inmuebles...');
+  try {
+    await page.goto('https://inmuebles.mercadolibre.com.ar/', { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+    await sleep(3000);
+    await page.goto('https://inmuebles.mercadolibre.com.ar/casas/venta/cordoba/', { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+    await sleep(3000);
+    const warmUrl = page.url();
+    if (/account-verification|\/login|\/registration/.test(warmUrl)) {
+      console.error(`Warm-up YA fue bloqueado: ${warmUrl}`);
+      console.error('Abortando — ML rechaza la sesión desde el primer fetch.');
+      await browser.close();
+      process.exit(1);
+    }
+    console.log('Warm-up OK. Empezando bboxes...');
+  } catch (e) {
+    console.error('Warm-up falló:', e.message);
+    await browser.close();
+    process.exit(1);
+  }
 
   // BFS sobre bboxes: cada uno se exhauste por paginación. Si llega al cap, subdividimos.
   const queue = SEED_BBOXES.map(b => ({ ...b, depth: 0 }));
