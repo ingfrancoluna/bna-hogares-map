@@ -302,7 +302,11 @@ function subdivide(bbox) {
           blocked = true;
           break outer;
         }
-        throw e;
+        // Errores transientes de red (ERR_NETWORK_CHANGED al alternar wifi/4G,
+        // timeouts, etc): logueamos y skippeamos al próximo bbox sin matar el
+        // proceso. Lo que tengamos en `byId` lo escribimos al final.
+        console.error(`  page ${pageNum} ERROR: ${e.message} — skip bbox`);
+        break;
       }
       const beforeSize = byId.size;
       let mapped = 0;
@@ -330,6 +334,15 @@ function subdivide(bbox) {
       const reason = saturated ? 'SATURADO' : `VACÍO con bbox grande (área ${area.toFixed(3)})`;
       console.log(`  → ${reason}, subdivido en 4 (${subs.map(s => s.name).join(', ')})`);
       queue.unshift(...subs);
+    }
+
+    // Checkpoint cada 5 bboxes: si todo se rompe (red, browser crash), al menos
+    // tenemos lo recolectado hasta acá grabado a disco.
+    if (bboxCount % 5 === 0 && byId.size >= 100) {
+      try {
+        fs.writeFileSync(OUT_FILE, JSON.stringify([...byId.values()]));
+        console.log(`  [checkpoint] ${byId.size} items → ${OUT_FILE}`);
+      } catch (e) { console.error('  checkpoint falló:', e.message); }
     }
   }
 
