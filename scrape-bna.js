@@ -2,11 +2,14 @@ const fs = require('fs');
 
 const API = 'https://mashogaresconbna.com.ar/api/propiedades';
 const PROVINCIA = 'Córdoba';
-const TIPO = 'Casa';
+// La API rechaza el fetch sin tipo (HTTP 500), así que hacemos un GET por cada tipo
+// que cubrimos. Casa + Depto + PH son los tres con stock real en Córdoba; los demás
+// (Lote, Quinta, Local…) devuelven listas vacías.
+const TIPOS = ['Casa', 'Departamento', 'PH'];
 const TIPO_OPERACION = 'Venta';
 
-async function fetchAll() {
-  const url = `${API}?limit=30000&page=1&tipo=${encodeURIComponent(TIPO)}&tipoOperacion=${encodeURIComponent(TIPO_OPERACION)}`;
+async function fetchTipo(tipo) {
+  const url = `${API}?limit=30000&page=1&tipo=${encodeURIComponent(tipo)}&tipoOperacion=${encodeURIComponent(TIPO_OPERACION)}`;
   console.log(`GET ${url}`);
   const res = await fetch(url, {
     headers: {
@@ -15,10 +18,20 @@ async function fetchAll() {
       'Accept-Language': 'es-AR,es;q=0.9'
     }
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} (tipo=${tipo})`);
   const json = await res.json();
-  if (json.internalStatus !== 'SUCCESS') throw new Error(`internalStatus=${json.internalStatus}`);
+  if (json.internalStatus !== 'SUCCESS') throw new Error(`internalStatus=${json.internalStatus} (tipo=${tipo})`);
   return json.response.data;
+}
+
+async function fetchAll() {
+  const all = [];
+  for (const t of TIPOS) {
+    const arr = await fetchTipo(t);
+    console.log(`  tipo=${t}: ${arr.length}`);
+    all.push(...arr);
+  }
+  return all;
 }
 
 function parseNum(v) {
@@ -60,13 +73,14 @@ function mapItem(p) {
     comodidades,
     imagen: Array.isArray(p.imagenes) && p.imagenes.length ? p.imagenes[0] : null,
     fechaCreacion: p.fechaCreacion || null,
+    tipo: p.tipo || '',
     fuente: 'bna'
   };
 }
 
 (async () => {
   const all = await fetchAll();
-  console.log(`Recibidas: ${all.length} propiedades (todo el país, ${TIPO} en ${TIPO_OPERACION})`);
+  console.log(`Recibidas: ${all.length} propiedades (todo el país, tipos: ${TIPOS.join('+')}, op: ${TIPO_OPERACION})`);
 
   const filtered = all.filter(p =>
     p.provincia === PROVINCIA &&
