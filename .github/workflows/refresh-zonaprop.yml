@@ -17,6 +17,12 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
       - name: Run Zonaprop scraper
         run: node scrape-zonaprop.js
 
