@@ -101,11 +101,7 @@ function loadPrevious() {
   }
 }
 
-(async () => {
-  const previous = loadPrevious();
-  console.log(`Previo en disco: ${previous.length} items`);
-
-  console.log('Lanzando Chromium headless...');
+async function tryFetchState() {
   const browser = await chromium.launch({
     headless: true,
     args: ['--disable-blink-features=AutomationControlled']
@@ -116,7 +112,6 @@ function loadPrevious() {
     viewport: { width: 1280, height: 800 },
     extraHTTPHeaders: { 'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8' }
   });
-  // Stealth: borrar huellas de webdriver que Cloudflare chequea.
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en'] });
@@ -131,13 +126,39 @@ function loadPrevious() {
     }
   });
   const page = await context.newPage();
+  try {
+    const html = await fetchHtmlBrowser(page, pageUrl());
+    return { state: extractState(html), htmlBytes: html.length };
+  } finally {
+    await browser.close();
+  }
+}
 
-  console.log('Bajando página 1...');
-  const html = await fetchHtmlBrowser(page, pageUrl());
-  const state = extractState(html);
-  await browser.close();
+(async () => {
+  const previous = loadPrevious();
+  console.log(`Previo en disco: ${previous.length} items`);
 
-  if (!state) throw new Error('No pude extraer PRELOADED_STATE de la página 1');
+  // Datadome bloquea por IP. En GH Actions los runners rotan IPs entre runs, pero
+  // dentro de un mismo run podemos reintentar varias veces: a veces el segundo
+  // navegador "fresh" pasa porque Cloudflare ajusta su scoring tras unos segundos.
+  const MAX_ATTEMPTS = 4;
+  let state = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    console.log(`Bajando página 1... (intento ${attempt}/${MAX_ATTEMPTS})`);
+    try {
+      const r = await tryFetchState();
+      if (r.state) { state = r.state; break; }
+      console.log(`  Sin PRELOADED_STATE (htmlBytes=${r.htmlBytes}); probablemente Datadome challenge.`);
+    } catch (e) {
+      console.log(`  Error: ${e.message}`);
+    }
+    if (attempt < MAX_ATTEMPTS) {
+      const wait = 5000 + attempt * 5000; // 10s, 15s, 20s
+      console.log(`  Esperando ${wait/1000}s antes de reintentar...`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+  if (!state) throw new Error(`No pude extraer PRELOADED_STATE tras ${MAX_ATTEMPTS} intentos`);
 
   const totalPosts = state.listStore?.paging?.total || 0;
   const totalPages = state.listStore?.paging?.totalPages || 1;
