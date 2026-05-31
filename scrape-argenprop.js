@@ -222,8 +222,24 @@ function saveCache(cache) {
   });
   const page = await context.newPage();
 
-  console.log('Bajando primera página...');
-  const firstHtml = await fetchHtmlBrowser(page, `${BASE}${LISTING_PATH}?pagina-1`);
+  // AWS WAF bloquea intermitentemente las IPs del runner. El primer fetch puede
+  // venir con el challenge page (~900 bytes, sin cards). Reintentamos hasta 4 veces
+  // con backoff antes de rendirnos. Un goto fresco a veces pasa donde el anterior fue
+  // rechazado porque el cookie aws-waf-token ya quedó persistido en el context.
+  let firstHtml;
+  const MAX_ATTEMPTS = 4;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    console.log(`Bajando primera página... (intento ${attempt}/${MAX_ATTEMPTS})`);
+    firstHtml = await fetchHtmlBrowser(page, `${BASE}${LISTING_PATH}?pagina-1`);
+    const cards = parseCards(firstHtml);
+    if (cards.length > 0) break;
+    console.log(`  Sin cards (htmlBytes=${firstHtml.length}); probablemente AWS WAF challenge.`);
+    if (attempt < MAX_ATTEMPTS) {
+      const wait = 5000 + attempt * 5000; // 10s, 15s, 20s
+      console.log(`  Esperando ${wait/1000}s antes de reintentar...`);
+      await sleep(wait);
+    }
+  }
   let totalPages = parseTotalPages(firstHtml);
   if (MAX_PAGES > 0) totalPages = Math.min(totalPages, MAX_PAGES);
   console.log(`Páginas a recorrer: ${totalPages}`);
@@ -313,14 +329,17 @@ function saveCache(cache) {
   console.log(`  Sin coords (descartadas): ${geoMisses}`);
   console.log(`  Tasa éxito: ${(geoHits / items.length * 100).toFixed(1)}%`);
 
+  // Safeguard: si el scrape devolvió 0 (típicamente porque AWS WAF nos rechazó),
+  // NO sobrescribir el archivo previo. Salimos con error para que el commit step
+  // detecte que no hay cambios y no pisemos los datos buenos con [].
+  if (result.length === 0) {
+    console.error('Cero propiedades con coords. Algo falla — no sobrescribo OUT_FILE.');
+    process.exit(1);
+  }
+
   fs.writeFileSync(OUT_FILE, JSON.stringify(result));
   console.log(`${OUT_FILE}: ${(fs.statSync(OUT_FILE).size / 1024).toFixed(1)} KB`);
   console.log(`${CACHE_FILE}: ${Object.keys(cache).length} entradas`);
-
-  if (result.length === 0) {
-    console.error('Cero propiedades con coords. Algo falla.');
-    process.exit(1);
-  }
 })().catch(e => {
   console.error('FATAL:', e);
   process.exit(1);
