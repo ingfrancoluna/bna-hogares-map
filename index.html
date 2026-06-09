@@ -23,6 +23,8 @@
     #login-box button{width:100%;background:#f97316;color:#fff;border:none;border-radius:7px;padding:11px;font-size:14px;font-weight:700;cursor:pointer}
     #login-box button:hover{background:#ea6a0a}
     #login-error{color:#ef4444;font-size:12px;margin-top:10px;display:none;font-weight:600}
+    #login-box .calc-link{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;padding:10px;background:#fff;color:#2d6a9f;border:1.5px solid #2d6a9f;border-radius:7px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;transition:all .15s}
+    #login-box .calc-link:hover{background:#2d6a9f;color:#fff}
 
     /* APP */
     /* position:fixed + inset:0 ata el #app al viewport real visible.
@@ -226,6 +228,7 @@
     <input type="password" id="pwd-input" placeholder="Contraseña" onkeydown="if(event.key==='Enter')checkLogin()">
     <button onclick="checkLogin()">Ingresar</button>
     <div id="login-error">Contraseña incorrecta. Intentá de nuevo.</div>
+    <a class="calc-link" href="./calculadora_hipotecaria_uva.html">&#129518; Calculadora hipotecaria UVA</a>
   </div>
 </div>
 

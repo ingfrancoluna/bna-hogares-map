@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora Hipotecaria UVA – BNA</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f4f0;
+    --border: #e0ddd6;
+    --border2: #ccc9c0;
+    --text: #1a1916;
+    --text2: #6b6860;
+    --text3: #9b9890;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --blue: #185FA5;
+    --blue-bg: #E6F1FB;
+    --green: #1D9E75;
+    --green-bg: #EAF3DE;
+    --green-text: #3B6D11;
+    --amber: #EF9F27;
+    --amber-bg: #FAEEDA;
+    --amber-text: #854F0B;
+    --red: #E24B4A;
+    --red-bg: #FCEBEB;
+    --red-text: #A32D2D;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1b18;
+      --bg2: #28271f;
+      --border: #3a3830;
+      --border2: #4a4840;
+      --text: #f0ede6;
+      --text2: #a09d96;
+      --text3: #706d66;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg2); color: var(--text); }
+  .page { max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 13px; color: var(--text2); margin: 0 0 1.5rem; }
+  .card { background: var(--bg); border: .5px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 12px; }
+  .stat { background: var(--bg2); border-radius: var(--radius-sm); padding: 10px 14px; }
+  .lbl { font-size: 12px; color: var(--text2); margin: 0 0 3px; }
+  .val { font-size: 14px; font-weight: 500; margin: 0; }
+  .vlg { font-size: 24px; font-weight: 600; margin: 0; }
+  .sub { font-size: 12px; color: var(--text2); margin: 3px 0 0; }
+  .g2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+  .g4 { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+  @media(min-width:520px) { .g4 { grid-template-columns: repeat(4,1fr); } }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .lrow { font-size: 13px; color: var(--text2); min-width: 160px; }
+  .ttl { font-weight: 600; font-size: 15px; margin: 0 0 14px; }
+  .section-header { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--text3); margin: 0 0 10px; }
+  .bw { background: var(--bg2); border-radius: 4px; height: 10px; overflow: hidden; }
+  .bf { height: 100%; border-radius: 4px; transition: width .3s; }
+  .alg { border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; line-height: 1.6; margin-top: 10px; }
+  .ag { background: var(--green-bg); color: var(--green-text); }
+  .aa { background: var(--amber-bg); color: var(--amber-text); }
+  .ar { background: var(--red-bg); color: var(--red-text); }
+  .agr { background: var(--bg2); color: var(--text2); }
+  .sc { border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 10px; cursor: pointer; border: 2px solid transparent; transition: border-color .15s; }
+  .sc:hover { border-color: var(--border2); }
+  .s1 { border-color: var(--blue); background: #F0F7FF; }
+  .s2 { border-color: var(--amber-text); background: #FFFAF0; }
+  @media (prefers-color-scheme: dark) { .s1 { background: #0d2a45; } .s2 { background: #3a2800; } }
+  .gf { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: .5px solid var(--border); font-size: 13px; }
+  .gf:last-child { border-bottom: none; }
+  .pb { position: relative; height: 28px; border-radius: 6px; overflow: hidden; background: var(--bg2); }
+  .pl { height: 100%; background: var(--amber-bg); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--amber-text); font-weight: 600; position: absolute; left: 0; top: 0; }
+  .pf { position: absolute; top: 0; right: 0; height: 100%; background: var(--green-bg); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--green-text); font-weight: 600; }
+  .btn { padding: 7px 14px; border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; border: .5px solid var(--border2); background: var(--bg); color: var(--text2); transition: all .15s; }
+  .btn:hover { border-color: var(--blue); color: var(--blue); }
+  .btn.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn.on0 { background: var(--bg2); color: var(--text); border-color: var(--border2); }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-sm); display: inline-block; }
+  .tag-blue { background: var(--blue-bg); color: var(--blue); }
+  .tag-green { background: var(--green-bg); color: var(--green-text); }
+  .tag-amber { background: var(--amber-bg); color: var(--amber-text); }
+  .tag-red { background: var(--red-bg); color: var(--red-text); }
+  select, input[type=number] { padding: 6px 10px; font-size: 13px; border-radius: var(--radius-sm); border: .5px solid var(--border2); background: var(--bg); color: var(--text); outline: none; }
+  select:focus, input[type=number]:focus { border-color: var(--blue); }
+  input[type=range] { accent-color: var(--blue); width: 100px; }
+  .divider { border: none; border-top: .5px solid var(--border); margin: 12px 0; }
+  footer { text-align: center; font-size: 12px; color: var(--text3); margin-top: 2rem; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Calculadora Hipotecaria UVA</h1>
+  <p class="subtitle">Banco Nación Argentina · Reglamentación 800 · Vivienda única</p>
+
+  <!-- DATOS -->
+  <div class="card">
+    <p class="ttl">Datos de la operación</p>
+    <div class="row"><label class="lrow">Precio propiedad</label><span style="font-size:13px;color:var(--text2)">u$s</span><input type="number" id="P" value="130000" min="10000" max="500000" step="1000" style="width:120px"></div>
+    <div class="row"><label class="lrow">Aporte propio</label><span style="font-size:13px;color:var(--text2)">u$s</span><input type="number" id="A" value="32500" min="0" max="500000" step="500" style="width:120px"><span id="atag" class="tag tag-blue">25%</span></div>
+    <div class="row"><label class="lrow">Tipo de cambio</label><span style="font-size:13px;color:var(--text2)">$</span><input type="number" id="TC" value="1465" min="500" max="5000" step="50" style="width:100px"><span style="font-size:13px;color:var(--text2)">/ USD</span></div>
+    <div class="row"><label class="lrow">Valor UVA</label><span style="font-size:13px;color:var(--text2)">$</span><input type="number" id="UV" value="1980.92" min="100" max="10000" step=".01" style="width:120px"><span class="tag tag-green">08/06/2026</span></div>
+    <div class="row" style="margin-bottom:0"><label class="lrow">Plazo</label>
+      <select id="PL">
+        <option value="60">5 años</option><option value="120">10 años</option>
+        <option value="180" selected>15 años</option><option value="240">20 años</option>
+        <option value="300">25 años</option><option value="360">30 años</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- GASTOS -->
+  <div class="card">
+    <p class="ttl">Gastos de la operación</p>
+    <div class="row"><label class="lrow">Escribanía</label><input type="range" id="ESL" min="4" max="8" step=".5" value="6"><input type="number" id="EP" value="6" min="4" max="8" step=".5" style="width:65px"><span style="font-size:13px;color:var(--text2)">% del valor</span></div>
+    <div class="row" style="margin-bottom:14px"><label class="lrow">Corredor inmob.</label><input type="range" id="CSL" min="0" max="6" step=".5" value="3"><input type="number" id="CP" value="3" min="0" max="6" step=".5" style="width:65px"><span style="font-size:13px;color:var(--text2)">% del valor</span></div>
+    <div id="GD" style="border-top:.5px solid var(--border);padding-top:12px"></div>
+  </div>
+
+  <!-- RESUMEN -->
+  <div class="card"><p class="ttl">Resumen de la operación</p><div id="RES"></div></div>
+
+  <!-- CUOTA -->
+  <p class="ttl" style="margin:0 0 10px">Tu cuota mensual</p>
+  <div class="sc s1" onclick="setSc(1)">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div><p style="font-weight:600;font-size:15px;margin:0 0 4px">Sin prima de tope</p><span class="tag tag-blue">TNA 6,00% · Sin cobertura CVS</span></div>
+      <p class="vlg" id="C1" style="color:var(--blue)">—</p>
+    </div>
+    <div id="D1"></div>
+  </div>
+  <div class="sc s2" onclick="setSc(2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div><p style="font-weight:600;font-size:15px;margin:0 0 4px">Con prima de tope CVS</p><span class="tag tag-amber">TNA 7,50% · Cuota protegida contra inflación</span></div>
+      <p class="vlg" id="C2" style="color:var(--amber-text)">—</p>
+    </div>
+    <div id="D2"></div>
+  </div>
+
+  <!-- CANCELACION -->
+  <div class="card" style="margin-top:4px">
+    <p class="ttl">Cancelación anticipada</p>
+    <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px">
+      <p style="font-size:13px;font-weight:600;margin:0 0 4px">Período con comisión del 4%</p>
+      <p style="font-size:12px;color:var(--text2);margin:0 0 12px">La comisión aplica <strong>solo sobre el monto que cancelás</strong>, no sobre el saldo total de la deuda.</p>
+      <div id="PBW"></div>
+      <div class="g2" style="margin-top:10px" id="PBS"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn on0" id="TN" onclick="setTab('n')">Sin cancelación</button>
+      <button class="btn" id="TU" onclick="setTab('u')">Pago único</button>
+      <button class="btn" id="TP" onclick="setTab('p')">Mensual extra</button>
+      <button class="btn" id="TA" onclick="setTab('a')">Aguinaldo anual</button>
+    </div>
+
+    <div id="PN"><p style="font-size:13px;color:var(--text2);margin:0">Pagás solo la cuota mensual durante todo el plazo, sin ningún pago adicional.</p></div>
+
+    <div id="PU" style="display:none">
+      <div class="row"><label class="lrow">Monto a cancelar</label><span style="font-size:13px;color:var(--text2)">$</span><input type="number" id="PGU" value="1000000" min="100000" step="100000" style="width:140px"></div>
+      <div class="row" style="margin-bottom:0"><label class="lrow">En el mes número</label><input type="number" id="MEU" value="12" min="1" max="360" style="width:80px"><span id="TGU" class="tag">—</span></div>
+    </div>
+
+    <div id="PP" style="display:none">
+      <div class="row"><label class="lrow">Monto extra mensual</label><span style="font-size:13px;color:var(--text2)">$</span><input type="number" id="PGP" value="200000" min="10000" step="50000" style="width:140px"></div>
+      <div class="row" style="margin-bottom:0"><label class="lrow">Desde el mes</label><input type="number" id="MED" value="1" min="1" max="360" style="width:80px"><span id="TGP" class="tag">—</span></div>
+    </div>
+
+    <div id="PA" style="display:none">
+      <div class="row" style="margin-bottom:6px"><label class="lrow">Monto del aguinaldo</label><span style="font-size:13px;color:var(--text2)">$</span><input type="number" id="PGA" value="1980920" min="100000" step="100000" style="width:140px"></div>
+      <p style="font-size:12px;color:var(--text2);margin:0">Se aplica una vez por año desde el mes 12 en adelante.</p>
+    </div>
+
+    <div id="CR" style="margin-top:12px"></div>
+  </div>
+
+  <!-- VS ALQUILER -->
+  <div id="ALQ"></div>
+
+  <!-- INFO -->
+  <div class="card" style="background:var(--bg2);border:none">
+    <p class="ttl" style="margin-bottom:10px">Condiciones del crédito (Reglamentación 800)</p>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:13px;color:var(--text2)">
+      <div>✓ TNA 6% para haberes BNA</div>
+      <div>✓ Sistema francés mensual</div>
+      <div>✓ Cuotas el día 10 de cada mes</div>
+      <div>✓ Mínimo: 15.000 UVAs</div>
+      <div>✓ Máximo: 260.000 UVAs</div>
+      <div>✓ Cancelación parcial o total</div>
+      <div>✓ Seguro de vida incluido (BNA)</div>
+      <div>✓ Seguro de incendio a cargo tuyo</div>
+    </div>
+    <hr class="divider">
+    <p style="font-size:12px;color:var(--text3);margin:0;line-height:1.6">
+      Esta calculadora es orientativa. Los valores de UVA y tipo de cambio cambian diariamente. 
+      El monto final del préstamo queda sujeto a la tasación del banco y al análisis crediticio. 
+      El banco financia hasta el 75% del menor entre precio de compra y tasación.
+    </p>
+  </div>
+
+  <footer>Calculadora hipotecaria UVA · BNA Reglamentación 800 · Actualizado 08/06/2026</footer>
+</div>
+
+<script>
+var r1=.005,r2=.00625,tab='n',sc=1;
+var F=function(n){return '$'+Math.round(n).toLocaleString('es-AR');};
+var U=function(n){return 'u$s '+Math.round(n).toLocaleString('es-AR');};
+var cc=function(m,r,n){return m>0?m*r/(1-Math.pow(1+r,-n)):0;};
+var gv=function(id){return+document.getElementById(id).value||0;};
+var lim=function(n){return Math.max(Math.ceil(n/4),6);};
+var tg=function(l){
+  var el=document.createElement('span');
+  el.className='tag '+(l?'tag-amber':'tag-green');
+  el.textContent=l?'Con comision 4%':'Sin comision';
+  return el.outerHTML;
+};
+var am=function(k,q,r,pe){
+  var m=0,ti=0,tp=0;
+  while(k>1&&m<600){m++;var i=k*r;k-=Math.min(q-i,k);ti+=i;tp+=q;var x=pe[m]||0;if(x>0&&k>0){var c=Math.min(x,k);k-=c;tp+=c;}if(k<=0)break;}
+  return{m:m,tp:tp,ti:ti};
+};
+function setTab(t){
+  tab=t;
+  ['n','u','p','a'].forEach(function(x){
+    document.getElementById('P'+x.toUpperCase()).style.display=x===t?'block':'none';
+    document.getElementById('T'+x.toUpperCase()).className='btn'+(x===t?(t==='n'?' on0':' on'):'');
+  });
+  render();
+}
+function setSc(s){sc=s;render();}
+function render(){
+  var p=gv('P')||130000,a=gv('A')||32500,tc=gv('TC')||1465,uv=gv('UV')||1980.92,n=gv('PL')||180;
+  var ep=gv('EP')||6,cp=gv('CP')||3;
+  var mARS=Math.max(0,(p-a))*tc;
+  var aP=p>0?Math.round(a/p*100):0,lP=p>0?Math.round(mARS/(p*tc)*100):0,ins=a<p*.25;
+  var q1=cc(mARS,r1,n),q2=cc(mARS,r2,n),pr=q2-q1;
+  var mU=uv>0?mARS/uv:0,dL=mU<=260000;
+  var esc=p*tc*(ep/100),cor=p*tc*(cp/100),gtot=esc+cor,gUSD=gtot/tc,tEf=a+gUSD;
+  var rC=sc===2?r2:r1,q=sc===2?q2:q1,lm=lim(n);
+
+  // aporte tag
+  var at=document.getElementById('atag');
+  at.textContent=aP+'%';
+  at.className='tag '+(ins?'tag-red':aP>=30?'tag-green':'tag-blue');
+
+  // gastos
+  document.getElementById('GD').innerHTML=
+    '<div class="gf"><span style="color:var(--text2)">Escribanía ('+ep+'%)</span><span style="font-weight:500">'+F(Math.round(esc))+'<span style="font-size:11px;color:var(--text2)"> / '+U(esc/tc)+'</span></span></div>'+
+    '<div class="gf"><span style="color:var(--text2)">Corredor inmob. ('+cp+'%)</span><span style="font-weight:500">'+F(Math.round(cor))+'<span style="font-size:11px;color:var(--text2)"> / '+U(cor/tc)+'</span></span></div>'+
+    '<div class="gf" style="font-weight:600"><span>Total ('+(ep+cp)+'% del valor)</span><span>'+F(Math.round(gtot))+'<span style="font-size:11px;font-weight:400;color:var(--text2)"> / '+U(gUSD)+'</span></span></div>';
+
+  // resumen
+  var pU=Math.round((mU/260000)*100);
+  document.getElementById('RES').innerHTML=
+    '<div class="g4" style="margin-bottom:12px">'+
+    '<div class="stat"><p class="lbl">Precio propiedad</p><p class="val">'+U(p)+'</p><p class="sub">'+F(p*tc)+'</p></div>'+
+    '<div class="stat"><p class="lbl">Préstamo al banco ('+lP+'%)</p><p class="val">'+U(Math.round(mARS/tc))+'</p><p class="sub">'+F(Math.round(mARS))+'</p></div>'+
+    '<div class="stat" style="border:.5px solid '+(dL?'var(--green)':'var(--red)')+'"><p class="lbl">Préstamo en UVAs</p><p class="val" style="color:'+(dL?'var(--green)':'var(--red)')+'">'+Math.round(mU).toLocaleString('es-AR')+'</p><p class="sub">'+pU+'% del máximo (260.000)</p></div>'+
+    '<div class="stat"><p class="lbl">Efectivo día de firma</p><p class="val">'+U(Math.round(tEf))+'</p><p class="sub">Aporte + gastos</p></div></div>'+
+    '<div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px"><span>'+Math.round(mU).toLocaleString('es-AR')+' UVAs solicitadas</span><span>Límite: 260.000 UVAs</span></div>'+
+    '<div class="bw"><div class="bf" style="width:'+Math.min(pU,100)+'%;background:'+(dL?'var(--green)':'var(--red)')+'"></div></div></div>'+
+    (ins?'<div class="alg ar" style="margin-top:10px"><strong>Aporte insuficiente.</strong> El banco requiere mínimo 25% del valor ('+U(p*.25)+'). Te faltan '+U(p*.25-a)+'.</div>':'');
+
+  // cuotas
+  document.getElementById('C1').textContent=F(Math.round(q1));
+  document.getElementById('C2').textContent=F(Math.round(q2));
+  var b1=am(mARS,q1,r1,{}),b2=am(mARS,q2,r2,{});
+
+  var dh=function(tp,ti,pc,cb,ex){
+    return '<div class="g2" style="margin-bottom:12px">'+
+      '<div class="stat"><p class="lbl">Total pagado (nominal)</p><p class="val">'+F(Math.round(tp))+'</p><p class="sub">≈ '+U(tp/tc)+'</p></div>'+
+      '<div class="stat"><p class="lbl">Intereses totales</p><p class="val" style="color:var(--red)">'+F(Math.round(ti))+'</p><p class="sub">'+Math.round(ti/mARS*100)+'% del capital prestado</p></div></div>'+
+      '<div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:3px"><span>Capital ('+pc+'%)</span><span>Intereses ('+(100-pc)+'%)</span></div>'+
+      '<div class="bw" style="display:flex"><div class="bf" style="width:'+pc+'%;background:var(--green);border-radius:4px 0 0 4px"></div>'+
+      '<div class="bf" style="width:'+(100-pc)+'%;background:'+cb+';border-radius:0 4px 4px 0"></div></div></div>'+(ex||'');
+  };
+  document.getElementById('D1').innerHTML=dh(b1.tp,b1.ti,Math.round(mARS/b1.tp*100),'#378ADD',
+    '<p style="font-size:12px;color:var(--text2);margin:8px 0 0">Cuota mensual ≈ '+U(q1/tc)+'</p>');
+  document.getElementById('D2').innerHTML=dh(b2.tp,b2.ti,Math.round(mARS/b2.tp*100),'var(--amber)',
+    '<p style="font-size:12px;color:var(--amber-text);margin:8px 0 0">Prima mensual: +'+F(Math.round(pr))+' (≈ '+U(pr/tc)+') · Cuota total ≈ '+U(q2/tc)+'</p>');
+
+  // periodo comision
+  var lPct=Math.round((lm/n)*100);
+  document.getElementById('PBW').innerHTML=
+    '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;display:flex;justify-content:space-between">'+
+    '<span style="color:var(--amber-text)">⚠ Con comisión: meses 1 – '+lm+'</span>'+
+    '<span style="color:var(--green-text)">✓ Sin comisión: mes '+(lm+1)+' en adelante</span></div>'+
+    '<div class="pb"><div class="pl" style="width:'+lPct+'%">Con comisión 4%</div><div class="pf" style="width:'+(100-lPct)+'%">Gratis</div></div>';
+  document.getElementById('PBS').innerHTML=
+    '<div class="stat"><p class="lbl">Comisión hasta el mes</p><p class="val" style="color:var(--amber-text)">'+lm+'</p><p class="sub">'+Math.floor(lm/12)+' años y '+lm%12+' meses desde el inicio</p></div>'+
+    '<div class="stat"><p class="lbl">Cancelación gratuita desde</p><p class="val" style="color:var(--green-text)">Mes '+(lm+1)+'</p><p class="sub">'+Math.floor((lm+1)/12)+' años y '+(lm+1)%12+' meses desde el inicio</p></div>';
+
+  // tags de modo
+  if(tab==='u'){var mu=gv('MEU')||12;var el=document.getElementById('TGU');if(el)el.innerHTML=tg(mu<=lm);}
+  if(tab==='p'){var md=gv('MED')||1;var el2=document.getElementById('TGP');if(el2)el2.innerHTML=tg(md<=lm);}
+
+  // cancelacion
+  var base=am(mARS,q,rC,{}),pe={},mE=0;
+  if(tab==='n'){
+    document.getElementById('CR').innerHTML='';
+    return;
+  }
+  if(tab==='u'){var mu=gv('MEU')||12,pu=gv('PGU')||1000000;pe[mu]=pu;mE=mu<=lm?pu:0;}
+  else if(tab==='p'){var de=gv('MED')||1,pm=gv('PGP')||200000;for(var i=de;i<=n;i++)pe[i]=pm;mE=de<=lm?pm*Math.max(0,Math.min(lm,n)-de+1):0;}
+  else if(tab==='a'){var ag=gv('PGA')||1980920;for(var i=12;i<=n;i+=12)pe[i]=ag;var ac=0;for(var i=12;i<=lm;i+=12)ac++;mE=ag*ac;}
+
+  var con=am(mARS,q,rC,pe),ah=base.tp-con.tp,mh=base.m-con.m,com=mE*.04,ahn=ah-com;
+  var rh='<div class="g2" style="margin-bottom:10px">'+
+    '<div class="stat"><p class="lbl">Sin cancelación anticipada</p><p class="val" style="color:var(--text2)">'+base.m+' meses</p><p class="sub">Total: '+F(Math.round(base.tp))+'</p></div>'+
+    '<div class="stat" style="border:.5px solid var(--green)"><p class="lbl">Con cancelación anticipada</p><p class="val" style="color:var(--green)">'+con.m+' meses</p><p class="sub">Total: '+F(Math.round(con.tp))+'</p></div></div>';
+  if(com>0)rh+='<div class="alg aa"><strong>Comisión 4%</strong> sobre montos cancelados en período inicial: '+F(Math.round(com))+' (≈ '+U(com/tc)+')</div>';
+  rh+=ah>0
+    ?'<div class="alg '+(ahn>0?'ag':'aa')+'" style="margin-top:8px"><strong>Ahorro bruto: '+F(Math.round(ah))+'</strong>'+(com>0?' &nbsp;·&nbsp; Comisión: −'+F(Math.round(com))+' &nbsp;·&nbsp; <strong>Ahorro neto: '+F(Math.round(ahn))+'</strong>':'')+'<br>Terminás el crédito '+Math.floor(mh/12)+' año'+(Math.floor(mh/12)!==1?'s':'')+' y '+mh%12+' mes'+(mh%12!==1?'es':'')+' antes.</div>'
+    :'<div class="alg aa" style="margin-top:8px">El impacto es mínimo. Probá con un monto mayor o aplicarlo más temprano.</div>';
+  document.getElementById('CR').innerHTML=rh;
+
+  // vs alquiler
+  var alq=1000000,d1=q1-alq,d2=q2-alq;
+  document.getElementById('ALQ').innerHTML=
+    '<div class="card"><p class="ttl">Cuota vs. alquiler de referencia (~$1.000.000)</p>'+
+    '<div class="g2" style="margin-bottom:10px">'+
+    '<div class="stat"><p class="lbl">Sin prima de tope</p><p class="val" style="color:'+(d1<=0?'var(--green-text)':'var(--blue)')+'">'+(d1<=0?'−':'+')+''+F(Math.abs(Math.round(d1)))+'</p><p class="sub">'+(d1<=0?'Más barato que alquilar':'Más caro que alquilar')+'</p></div>'+
+    '<div class="stat"><p class="lbl">Con prima CVS</p><p class="val" style="color:'+(d2<=0?'var(--green-text)':'var(--amber-text)')+'">'+(d2<=0?'−':'+')+''+F(Math.abs(Math.round(d2)))+'</p><p class="sub">'+(d2<=0?'Más barato que alquilar':'Más caro que alquilar')+'</p></div></div>'+
+    '<div class="alg '+(d1<=0?'ag':'aa')+'">'+(d1<=0?'Con un aporte del '+aP+'%, la cuota sin prima queda '+F(Math.abs(Math.round(d1)))+' por debajo del alquiler de referencia. Comprar es más conveniente que alquilar.':'La cuota supera al alquiler de referencia en '+F(Math.round(d1))+'. Considerá aumentar el aporte propio para reducir el préstamo.')+'</div></div>';
+}
+
+// sync sliders
+document.getElementById('ESL').oninput=function(){document.getElementById('EP').value=this.value;render();};
+document.getElementById('EP').oninput=function(){document.getElementById('ESL').value=this.value;render();};
+document.getElementById('CSL').oninput=function(){document.getElementById('CP').value=this.value;render();};
+document.getElementById('CP').oninput=function(){document.getElementById('CSL').value=this.value;render();};
+['P','A','TC','UV','PL','PGU','MEU','PGP','MED','PGA'].forEach(function(id){
+  var el=document.getElementById(id);if(el)el.oninput=render;
+});
+render();
+</script>
+</body>
+</html>
