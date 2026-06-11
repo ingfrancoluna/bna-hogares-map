@@ -216,6 +216,20 @@ function removeBank(id){
   renderBanks();
   render();
 }
+function updateBank(id,field,value){
+  var b=banks.find(function(b){return b.id===id;});
+  if(!b)return;
+  b[field]=value;
+  // No re-renderizamos las cards para no perder el foco del input que está editando;
+  // sólo recalculamos resumen + tabla de comparación + cancelación.
+  render();
+  // Si cambió el nombre, refrescar el selector de banco en cancelación.
+  if(field==='name'){
+    var sel=document.getElementById('BANK_SEL');
+    var opt=sel.querySelector('option[value="'+id+'"]');
+    if(opt)opt.textContent=value;
+  }
+}
 function toggleCVS(id,val){
   var b=banks.find(function(b){return b.id===id;});
   if(!b)return;
